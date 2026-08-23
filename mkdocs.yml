@@ -1,5 +1,6 @@
 site_name: TAMALAB Documentation
 site_description: An AI Tamagotchi with an ESP32 body and a homelab brain
+site_url: https://jcarranz97.github.io/tamalab/
 
 repo_name: jcarranz97/tamalab
 repo_url: https://github.com/jcarranz97/tamalab
