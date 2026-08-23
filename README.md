@@ -55,3 +55,8 @@ daemon/      Python + SQLite. Owns state, runs the sim tick, hosts the brain,
 firmware/    ESP32-S3. Display, buttons, buzzer, I2S mic + speaker.
 docs/        These documents.
 ```
+
+## License
+
+[MIT](LICENSE). The design documents and, when they exist, the daemon and
+firmware are free to use, fork and adapt.
