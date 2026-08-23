@@ -1,0 +1,31 @@
+# MkDocs build output
+site/
+
+# --- Python (the daemon, and the docs toolchain) --------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- Runtime state --------------------------------------------------------
+# The daemon owns the truth, but the truth is local and per-deployment.
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# --- Firmware -------------------------------------------------------------
+.pio/
+build/
+sdkconfig.old
+managed_components/
+
+# --- Editors / OS ---------------------------------------------------------
+.DS_Store
+.idea/
+*.swp
