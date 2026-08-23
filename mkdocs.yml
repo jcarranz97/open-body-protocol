@@ -1,0 +1,86 @@
+site_name: TAMALAB Documentation
+site_description: An AI Tamagotchi with an ESP32 body and a homelab brain
+
+repo_name: jcarranz97/tamalab
+repo_url: https://github.com/jcarranz97/tamalab
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - toc.integrate
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Roadmap: roadmap.md
+  - Requirements: requirements.md
+  - Open Questions: open-questions.md
+  - Prior Art: prior-art.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Protocol: architecture/protocol.md
+    - Simulation: architecture/simulation.md
+    - Brain: architecture/brain.md
+    - Voice: architecture/voice.md
+    - Firmware: architecture/firmware.md
+    - Integrations: architecture/integrations.md
+    - Hardware: architecture/hardware.md
+    - Roaming (v2): architecture/roaming.md
+  - Original Brief: brief.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        # Emit ```mermaid fences as <div class="mermaid">…source…</div> and
+        # render them ourselves (docs/javascripts/mermaid-init.js).
+        #
+        # Material 9.7 also ships a Mermaid integration, which keys on
+        # <pre class="mermaid"><code> (fence_code_format). On the sibling
+        # project (Piezario) it left the diagram host EMPTY — the library
+        # loads, the element is swapped in, and no SVG is ever injected.
+        # Using fence_div_format keeps our markup out of its selector
+        # entirely, so the two cannot fight over the same nodes.
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - footnotes
+  - attr_list
+  - md_in_html
+  - tables
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js
+  - javascripts/mermaid-init.js

@@ -1,0 +1,31 @@
+/* Match checked task-list checkboxes to the indigo theme instead of the
+   default Material green (#00e676). The roadmap is one long task list, so
+   this is more visible here than it looks. */
+.md-typeset .task-list-control [type="checkbox"]:checked + .task-list-indicator::before {
+  background-color: var(--md-primary-fg-color);
+}
+
+/* Mermaid diagrams are rendered by docs/javascripts/mermaid-init.js into
+   <div class="mermaid">. Most types are configured with useMaxWidth so they
+   shrink to fit; give every diagram its own scroll context anyway so a wide
+   one scrolls itself instead of the page. */
+.md-typeset .mermaid {
+  overflow-x: auto;
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+.md-typeset .mermaid > svg {
+  max-width: none;
+  height: auto;
+}
+
+/* Keep the scrollbar unobtrusive but discoverable. */
+.md-typeset .mermaid::-webkit-scrollbar {
+  height: 0.4rem;
+}
+
+.md-typeset .mermaid::-webkit-scrollbar-thumb {
+  background-color: var(--md-default-fg-color--lighter);
+  border-radius: 0.2rem;
+}
