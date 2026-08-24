@@ -140,10 +140,19 @@ The same server, a different agent. **OpenCode has no `mcp add` command** —
 MCP servers are declared in a config file, and one that lives in the working
 directory applies to that project.
 
-`opencode.json` is committed alongside this experiment, so from here it is
-already configured:
+`opencode.jsonc` is committed alongside this experiment, so from here it is
+already configured.
 
-```json
+!!! warning "A project config shadows your global one"
+    A config in the working directory **overrides**
+    `~/.config/opencode/opencode.json` for the servers it names. Editing the
+    global file while this one exists changes nothing, and `opencode mcp
+    list` will keep showing the command from *here* — which is exactly how
+    an hour gets lost. Edit this file.
+
+The committed contents:
+
+```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -156,6 +165,10 @@ already configured:
   }
 }
 ```
+
+OpenCode reads `.jsonc`, so the committed file carries these warnings as
+comments next to the lines they apply to — a config that explains its own
+traps beats a README nobody re-reads.
 
 **Start OpenCode from this directory**, or the relative path will not
 resolve. OpenCode finds the config by scanning the project, but runs the
@@ -214,6 +227,9 @@ change the command array to the wrapped form:
 ```json
 "command": ["sg", "dialout", "-c", "python3 host/obp_mcp.py --log /tmp/obp-mcp.log"]
 ```
+
+in **`opencode.jsonc` in this directory** — not the global config, which this
+one shadows.
 
 Both forms are verified: the plain one offers `obp__status` alone from a
 session without the group, and the wrapped one offers all five tools.
