@@ -18,7 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from obp import (BodyClient, BodyError, BodyUnavailable, MqttConnection,  # noqa: E402
-                 MqttTransport, Registry, SerialTransport, describe_spec, resolve)
+                 MqttTransport, Registry, SerialTransport, describe_spec, expand,
+                 resolve)
 from obp.client import render_result  # noqa: E402
 from obp.naming import mcp_tool_name  # noqa: E402
 
@@ -48,7 +49,11 @@ def attach(args) -> tuple[Registry, MqttConnection | None]:
             except BodyError as exc:
                 print(f"{body_id}: {exc}", file=sys.stderr)
 
-    for spec in args.port:
+    # `auto` means every attached USB serial device, so it has to be expanded
+    # before resolving -- resolve() only matches one spec to one path and has
+    # no idea 'auto' is a word. Experiment 002 does this; this CLI did not, so
+    # --port auto quietly found nothing while reporting devices were attached.
+    for spec in expand(args.port):
         path = resolve(spec)
         if path is None:
             print(describe_spec(spec), file=sys.stderr)

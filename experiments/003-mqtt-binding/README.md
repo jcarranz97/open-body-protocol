@@ -256,15 +256,34 @@ request shows numeric ids parse correctly. Something else was wrong in that
 window and was cleared by the reflash. The binding has been reliable across
 every run since, so this is recorded rather than chased.
 
-### Part C — two bindings at once ⏳
+### Part C — two bindings at once ⏳ (partly run 2026-08-24)
 
 The plain Pico on USB **and** the Pico W over MQTT, in one registry, both
 offered to one agent. This is the claim that transport is a binding, stated
-as plainly as it can be.
+as plainly as it can be. Pending: the plain Pico needs to be attached.
+
+What has already run is the half nobody plans for. The Pico W exposes a USB
+serial console for its own debug log, and it is **not** an OBP body — so
+`--port auto` finds a device that opens cleanly, emits text, and cannot answer:
 
 ```text
-
+$ obp_cli --mqtt --port auto bodies
+[body stderr] up: body=picow-7c6e37 wifi=192.168.1.227 mqtt=connected
+/dev/serial/by-id/usb-Raspberry_Pi_Pico_E6614864D37C6E37-if00: no response to body/describe within 5.0s
+picow-7c6e37         Raspberry Pi Pico W body           2 verbs  via mqtt  caps: led
 ```
+
+One board, two ways in, and only the one that answers is a body — which is
+[H5a](../../docs/spec/conformance.md) meeting a real impostor rather than a
+contrived one. An attached device is a device; a body is something that
+replies.
+
+Getting there needed a fix. `--port auto` is this experiment's headline flag
+and it silently found nothing: `ports.expand()` turns `auto` into the attached
+devices, experiment 002 calls it, and this CLI never did — it passed the
+literal string `auto` to `resolve()`, which matched no path. The failure
+printed *"auto: not present"* directly above a list of attached devices, which
+is the kind of self-contradicting message that gets read past.
 
 ---
 
