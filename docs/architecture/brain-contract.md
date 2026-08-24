@@ -1,14 +1,62 @@
-# Brain
+# The brain contract
 
-The pluggable layer that turns a trigger and some context into one small JSON
-object. It is the only place in the system where a language model appears,
-and it is designed so that the rest of the pet cannot tell which model — or
-whether any model at all — is behind it.
+Anything that can take context and return a decision can be the brain. That
+is the whole port. A cloud model, a local Qwen on the same box, an agent
+harness with its own tools and memory — or a static line table, when nothing
+else is reachable.
 
-!!! abstract "The design rule"
-    **The pet must never know which model is thinking for it, and must never
-    wait on one.** The brain is a component behind a narrow interface, and the
-    canned-line table is always available as the zeroth provider.
+**Nothing here is ours, and nothing here is required to be.** The project
+does not ship a brain and should not: agents with a persona, memory and tool
+use are a commodity four times over. What it ships is the socket.
+
+## The four kinds
+
+| Kind | What it is | Identity owned by | Good at |
+|---|---|---|---|
+| `canned` | A static table keyed on situation. No network. | daemon | Never failing. The permanent last resort. |
+| `openai_compat` | Anything speaking `/v1/chat/completions` — Ollama, llama.cpp, vLLM, LM Studio, plus most cloud vendors | daemon | Local privacy, cheap cloud, and a Jetson with the model beside the servos |
+| `anthropic` | The native Messages API | daemon | Guaranteed schema conformance, prompt caching |
+| `harness` | OpenClaw, Hermes, OpenCode — an agent with its own loop, tools and memory | **the harness** | Doing things: MCP servers, files, calendars, multi-step work |
+
+The fourth is the interesting one, and it is cheaper than it looks:
+**Hermes exposes an OpenAI-compatible endpoint**, so a harness can be a
+`base_url` and a header rather than a new integration. OpenCode has a
+`serve` mode with an OpenAPI spec. Where a harness speaks that dialect, it
+plugs into the same adapter a raw model does.
+
+What changes with a harness is not the wire format but **who owns the
+character** — see [identity](identity.md), and expect to give up the persona
+and memory you would otherwise hold.
+
+## The port
+
+```python
+@dataclass
+class Capabilities:
+    structured: str      # none | json_mode | json_schema | grammar | native_strict
+    tools: bool
+    context_tokens: int
+    latency_class: str   # fast | slow | agentic
+    cost_class: str      # free | cheap | paid
+    privacy: str         # local | cloud
+    owns_identity: bool  # true for a harness with its own soul and memory
+
+class Brain(Protocol):
+    name: str
+    caps: Capabilities
+    def respond(self, ctx: Context) -> Decision: ...
+```
+
+A `Decision` is a short line to say, optionally a body verb to call, and
+optionally a fact to remember. Which body verbs exist is discovered from the
+[body contract](body-contract.md) at run time; the brain is told, never
+configured.
+
+**The body's tools reach every kind of brain through one adapter.** Bodies
+are re-exposed as an [MCP server](mcp.md), so an MCP-native harness connects
+to it directly, an OpenAI-compatible model receives the same tools as
+function definitions, and the canned brain ignores them. Written once, on
+the side we control.
 
 ## Two tiers: the voice and the senses
 
@@ -44,12 +92,12 @@ flowchart TB
     class M,C core
 ```
 
-**The voice tier is the pet talking.** It is required, it is on the critical
+**The voice tier is the thing speaking.** It is required, it is on the critical
 path, and its budget is a couple of seconds. A small model with native
 structured outputs answers it for a fraction of a cent, and `CannedBrain`
 answers it when nothing else can.
 
-**The sense tier is the pet finding something out.** It is optional, it is
+**The sense tier is the thing finding something out.** It is optional, it is
 never on the critical path, and it may take ten seconds because nobody is
 waiting: it produces a *fact*, which becomes context for the voice tier on
 the next utterance. This is where an agent harness, tool calling and MCP
@@ -57,7 +105,7 @@ belong (FR-140).
 
 Collapsing the two — routing every idle chirp through an agent loop — is the
 mistake this design exists to avoid. A harness is optimised for long,
-exploratory, many-turn work; a pet needs eleven words now. Ask a harness for
+exploratory, many-turn work; a reply needs eleven words now. Ask a harness for
 eleven words and you pay for a large system prompt, a tool-definition block
 and a loop that may decide to take four turns, on the *most* expensive
 provider you have (FR-141).
@@ -233,7 +281,7 @@ expression, and never talks to a body.
 ```mermaid
 sequenceDiagram
     autonumber
-    participant HL as Homelab (restic)
+    participant HL as An external event
     participant D as Daemon
     participant S as Sensor (harness)
     participant MCP as MCP servers
@@ -259,10 +307,10 @@ sequenceDiagram
     D-->>B: say (ttl_s: 45)
 ```
 
-Read step 3 carefully: **the pet reacts before the sensor answers.** The
+Read step 3 carefully: **the body reacts before the sensor answers.** The
 webhook already moved `health` and published a `sick` face; the sensor only
 decides what the pet says *about* it, seconds later. If the sensor times out,
-the pet still got upset — it just says something vaguer (NFR-019).
+the reaction still happened — it just says something vaguer (NFR-019).
 
 ### Which harness
 

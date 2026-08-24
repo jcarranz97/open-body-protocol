@@ -1,4 +1,4 @@
-/* TAMALAB body contract on a Raspberry Pi Pico, using the pico-sdk (C).
+/* OBP body contract on a Raspberry Pi Pico, using the pico-sdk (C).
  *
  * Speaks the identical wire protocol as ../micropython/main.py: newline-
  * delimited JSON-RPC 2.0 over USB CDC. The host client cannot tell which

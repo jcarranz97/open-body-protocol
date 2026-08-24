@@ -1,4 +1,4 @@
-/* json_min -- just enough JSON for the TAMALAB body contract, in C.
+/* json_min -- just enough JSON for the OBP body contract, in C.
  *
  * Deliberately small: the body contract's messages are shallow and known in
  * advance, so a full DOM parser would be more code than the firmware it

@@ -71,8 +71,8 @@ twice.
 
 ## 7. What is it called?
 
-TAMALAB is a working codename. The docs avoid baking it into the protocol —
-topics are `tama/`, which is short enough to live with, and no payload field
+OBP is a working codename. The docs avoid baking it into the protocol —
+topics are `obp/`, which is short enough to live with, and no payload field
 carries the product name.
 
 **Can wait indefinitely**, provided nothing but the topic prefix ever

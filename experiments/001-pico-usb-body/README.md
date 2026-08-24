@@ -20,14 +20,14 @@ Proves the host half works and that the transport is interchangeable:
 This part passes as of 2026-08-24.
 
 ```bash
-cd ~/repos/tamalab/experiments/001-pico-usb-body
+cd ~/repos/open-body-protocol/experiments/001-pico-usb-body
 
 python3 host/cli.py --fake describe
 python3 host/cli.py --fake call set_led --arg on=true
 python3 host/cli.py --fake call move --arg direction=forward --arg distance_cm=25
 python3 host/cli.py --fake call move --arg direction=sideways     # should fail cleanly
 python3 host/cli.py --fake call set_brightness --arg level=40
-TAMABODY_DIMMABLE=0 python3 host/cli.py --fake describe            # a W-shaped body: the dim verb is gone
+OBP_DIMMABLE=0 python3 host/cli.py --fake describe            # a W-shaped body: the dim verb is gone
 ```
 
 ## Part B — the Pico
@@ -83,7 +83,7 @@ cd firmware/pico-sdk
 export PICO_SDK_PATH=~/repos/pico-sdk
 cmake -B build -DPICO_BOARD=pico       # or pico_w / pico2 / pico2_w
 cmake --build build -j4
-# -> build/tamalab_body.uf2
+# -> build/obp_body.uf2
 ```
 
 Flash it: hold **BOOTSEL**, plug the Pico in, and copy the `.uf2` onto the
@@ -93,7 +93,7 @@ mass-storage device it presents. On Ubuntu it auto-mounts:
 # confirm where it landed
 findmnt -no TARGET -S LABEL=RPI-RP2        # usually /media/$USER/RPI-RP2
 
-cp build/tamalab_body.uf2 /media/$USER/RPI-RP2/
+cp build/obp_body.uf2 /media/$USER/RPI-RP2/
 sync
 ```
 
@@ -105,10 +105,10 @@ If it did not auto-mount:
 ```bash
 lsblk -o NAME,LABEL,SIZE | grep -i RPI-RP2
 sudo mkdir -p /mnt/pico && sudo mount /dev/sdX1 /mnt/pico
-sudo cp build/tamalab_body.uf2 /mnt/pico/ && sync
+sudo cp build/obp_body.uf2 /mnt/pico/ && sync
 ```
 
-(`picotool load -x build/tamalab_body.uf2` would avoid the BOOTSEL button
+(`picotool load -x build/obp_body.uf2` would avoid the BOOTSEL button
 entirely, but the copy the SDK downloads is built without USB support unless
 `libusb-1.0-0-dev` was installed before configuring.)
 
@@ -375,7 +375,7 @@ rather than asserted:
 firmware/micropython/main.py   MicroPython on the Pico, over USB CDC serial
 firmware/pico-sdk/             the same body in C, same wire protocol
 host/fake_body.py              the same body with no hardware, over a pipe
-host/tamabody/                 the host client: transports, contract, discovery
+host/obpbody/                 the host client: transports, contract, discovery
 host/cli.py                    drives any of them
 ```
 

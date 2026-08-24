@@ -6,7 +6,7 @@ It exists so the host half can be run and tested by anyone, and so the claim
 asserted: this file and firmware/main.py answer identically, over a pipe and
 over a USB cable respectively.
 
-Set TAMABODY_SERVO=0 to watch capability gating work -- servo_angle simply
+Set OBP_SERVO=0 to watch capability gating work -- servo_angle simply
 stops being advertised, and the host never learns such a verb exists.
 """
 
@@ -17,10 +17,10 @@ import os
 import sys
 
 FW = "fake-0.1.0"
-BODY_ID = "fake-" + os.environ.get("TAMABODY_ID", "0001")
-HAS_SERVO = os.environ.get("TAMABODY_SERVO", "0") != "0"
+BODY_ID = "fake-" + os.environ.get("OBP_ID", "0001")
+HAS_SERVO = os.environ.get("OBP_SERVO", "0") != "0"
 # Mirrors the real hardware split: a plain Pico can dim its LED, a Pico W cannot.
-DIMMABLE = os.environ.get("TAMABODY_DIMMABLE", "1") != "0"
+DIMMABLE = os.environ.get("OBP_DIMMABLE", "1") != "0"
 
 state = {"led": False, "level": 0, "angle": 90}
 

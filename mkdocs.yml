@@ -1,9 +1,9 @@
-site_name: TAMALAB Documentation
-site_description: An AI Tamagotchi with an ESP32 body and a homelab brain
-site_url: https://jcarranz97.github.io/tamalab/
+site_name: Open Body Protocol
+site_description: A standard way to connect an AI brain to a physical body
+site_url: https://jcarranz97.github.io/open-body-protocol/
 
-repo_name: jcarranz97/tamalab
-repo_url: https://github.com/jcarranz97/tamalab
+repo_name: jcarranz97/open-body-protocol
+repo_url: https://github.com/jcarranz97/open-body-protocol
 
 theme:
   name: material
@@ -38,10 +38,12 @@ nav:
   - Prior Art: prior-art.md
   - Architecture:
     - Overview: architecture/overview.md
+    - Body contract: architecture/body-contract.md
+    - Brain contract: architecture/brain-contract.md
+    - Identity & memory: architecture/identity.md
+    - Behaviour packs: architecture/behaviour-packs.md
     - Deployment: architecture/deployment.md
-    - Protocol: architecture/protocol.md
-    - Simulation: architecture/simulation.md
-    - Brain: architecture/brain.md
+    - Bindings: architecture/bindings.md
     - MCP & tools: architecture/mcp.md
     - Voice: architecture/voice.md
     - Firmware: architecture/firmware.md

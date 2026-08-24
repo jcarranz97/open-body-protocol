@@ -16,7 +16,7 @@ the work the pet is supposed to be keeping them company through.
 
 That constraint is what earns the feature: a second, independent renderer is
 the cheapest possible proof that the protocol is body-agnostic
-([protocol](protocol.md)). Anything the TUI cannot do from `state` + `say`
+([bindings](bindings.md)). Anything the TUI cannot do from `state` + `say`
 alone is a hole in the contract, found in Python in an afternoon rather than
 in C on a device six months later.
 
@@ -55,8 +55,8 @@ daemon's `active_body` pointer, most recent event wins (FR-062).
 
 ### Connected — the normal case
 
-The TUI subscribes to `tama/pet/state` and `tama/pet/say`, publishes to
-`tama/dev/<id>/event`, and registers itself in the device registry like any
+The TUI subscribes to `obp/state` and `obp/say`, publishes to
+`obp/body/<id>/event`, and registers itself in the device registry like any
 other body (FR-121):
 
 ```json
@@ -74,7 +74,7 @@ its place instead of being decoration.
 ### Solo — no homelab, no broker, no container
 
 ```bash
-uvx tamalab tui --solo
+uvx obp tui --solo
 ```
 
 The daemon core runs **in-process**, against a SQLite file in the user's XDG
@@ -163,7 +163,7 @@ FR-125):
 
 | Firmware | TUI |
 |---|---|
-| Last state in NVS, throttled | Last state in `$XDG_STATE_HOME/tamalab/state.json` |
+| Last state in NVS, throttled | Last state in `$XDG_STATE_HOME/obp/state.json` |
 | Ring buffer of ~32 events | Same queue, same ULIDs, same `ts` |
 | `clock_confident` may be false | Always true — a laptop has NTP |
 | Disconnected glyph | `● connected` / `○ offline` in the footer |
@@ -174,7 +174,7 @@ face is there the moment the command returns (NFR-015).
 ## Several terminals at once
 
 Expected, not an edge case: a TUI on the laptop and another on the desktop,
-each with its own device id. All bodies subscribe to `tama/pet/state`, so
+each with its own device id. All bodies subscribe to `obp/state`, so
 they agree; `say` is delivered to every subscribed body in v1, so a line the
 pet says appears in both windows. Per-body routing of `say` is a v2 concern,
 alongside the second physical body ([roaming](roaming.md)).
@@ -193,12 +193,12 @@ the solo default (NFR-017).
 ## Distribution
 
 ```bash
-uvx tamalab tui                 # connected, reads ~/.config/tamalab/client.toml
-uvx tamalab tui --solo          # no daemon, no broker, local SQLite
-uv tool install tamalab         # keep it on PATH
+uvx obp tui                 # connected, reads ~/.config/obp/client.toml
+uvx obp tui --solo          # no daemon, no broker, local SQLite
+uv tool install obp         # keep it on PATH
 ```
 
-Consistent with how the docs are built ([README](https://github.com/jcarranz97/tamalab#documentation)):
+Consistent with how the docs are built ([README](https://github.com/jcarranz97/open-body-protocol#documentation)):
 no virtualenv, no checkout, one command. The bar is that somebody hears about
 this and has a pet thirty seconds later.
 

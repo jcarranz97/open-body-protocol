@@ -87,7 +87,7 @@ is doing something no toy does.
 
 ### Why a webhook rather than the pet polling
 
-The daemon could query things itself, and with the [sense tier](brain.md) it
+The daemon could query things itself, and with the [sense tier](brain-contract.md) it
 can. But *reacting* wants a push: the interesting moment is the transition,
 and the systems that know about transitions already have somewhere to send
 them. A webhook also keeps the floor low — a shell script with `curl` is a
@@ -100,5 +100,5 @@ a window, and the brain trigger fires on the first one only.
 ## Adding a face later
 
 A web dashboard, a second physical body, a desk lamp that mirrors the mood —
-all of them are the same shape: subscribe to `tama/pet/state`, publish events
+all of them are the same shape: subscribe to `obp/state`, publish events
 to the bus. Nothing in the core needs to learn about them (FR-060).

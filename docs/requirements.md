@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-This document specifies **TAMALAB**: a physical desk pet whose state, memory
+This document specifies **Open Body Protocol**: a physical desk pet whose state, memory
 and personality live in a homelab container. It defines what the system must
 do and under which constraints. Every requirement carries a stable identifier
 (`FR-NNN`, `NFR-NNN`) that the architecture pages cite back.
@@ -73,13 +73,13 @@ every model switched off.
 
 | ID | Requirement |
 |---|---|
-| FR-010 | Control traffic SHALL use MQTT with a `tama/` topic prefix, with device topics keyed by a device id. |
-| FR-011 | The device SHALL register a Last Will and Testament on `tama/dev/<id>/status`; the daemon SHALL do the same on `tama/srv/status`. |
+| FR-010 | Control traffic SHALL use MQTT with a `obp/` topic prefix, with device topics keyed by a device id. |
+| FR-011 | The device SHALL register a Last Will and Testament on `obp/body/<id>/status`; the daemon SHALL do the same on `obp/srv/status`. |
 | FR-012 | The device SHALL announce firmware version and capabilities on boot via `hello`. |
 | FR-013 | Every device event SHALL carry a ULID, and the daemon SHALL deduplicate on it. |
 | FR-014 | Every payload SHALL carry a schema version `v` and an RFC3339 UTC timestamp `ts`. |
 | FR-015 | The daemon SHALL accept every schema version it has ever emitted; the device need only understand its own. |
-| FR-016 | Device credentials SHALL be per-device, and broker ACLs SHALL restrict a device to its own `tama/dev/<id>/#` and to `tama/pet/#`. |
+| FR-016 | Device credentials SHALL be per-device, and broker ACLs SHALL restrict a device to its own `obp/body/<id>/#` and to `obp/#`. |
 
 ### 3.3 Simulation
 
@@ -97,7 +97,7 @@ every model switched off.
 
 | ID | Requirement |
 |---|---|
-| FR-030 | The daemon SHALL publish the full state to `tama/pet/state` as a retained message on every change. |
+| FR-030 | The daemon SHALL publish the full state to `obp/state` as a retained message on every change. |
 | FR-031 | The device SHALL render from `expression`, `animation` and `mood` ids only; the server SHALL NOT send sprite data. |
 | FR-032 | A `say` SHALL carry `ttl_s`, and the device SHALL discard one received after expiry. |
 | FR-033 | `say` SHALL NOT be retained. |

@@ -161,8 +161,8 @@ a firmware invariant, not a policy (NFR-010).
 
 | Addition | Dir | Purpose |
 |---|---|---|
-| `tama/dev/<id>/event` with `type: voice` | dev→srv | Transcript, for the journal and the Telegram mirror |
-| `tama/pet/cmd` op `set_volume` | srv→dev | Volume control from Telegram |
+| `obp/body/<id>/event` with `type: voice` | dev→srv | Transcript, for the journal and the Telegram mirror |
+| `obp/cmd` op `set_volume` | srv→dev | Volume control from Telegram |
 
 Mirror every voice exchange to Telegram as text. It costs nothing, gives a
 free conversation log, and makes the pet feel like one continuous being

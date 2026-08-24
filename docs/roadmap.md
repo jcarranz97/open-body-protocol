@@ -75,10 +75,10 @@ second implementation before the firmware exists. See
 - [ ] Idle cadence and redraw discipline (NFR-014)
 - [ ] `--solo`: the core in-process against a local SQLite file, no broker
       (FR-122, FR-123, NFR-016)
-- [ ] `uvx tamalab tui` published and working from a clean machine (FR-130)
+- [ ] `uvx obp tui` published and working from a clean machine (FR-130)
 
 **Exit criterion:** you leave it open in a pane for a week without closing
-it, and somebody else runs `uvx tamalab tui --solo` and has a pet without
+it, and somebody else runs `uvx obp tui --solo` and has a pet without
 asking you anything.
 
 ## Phase 1 — dumb body
@@ -87,10 +87,10 @@ asking you anything.
       by configuration; one user for the daemon, one per device (FR-016,
       FR-163). On an HTTP-only cluster ingress, prefer MQTT over WebSocket
       ([deployment](architecture/deployment.md))
-- [ ] Daemon publishes retained `tama/pet/state` on every change (FR-030)
+- [ ] Daemon publishes retained `obp/state` on every change (FR-030)
 - [ ] ESP32: WiFi + MQTT + LWT, subscribe to state, render a face (FR-011)
 - [ ] `Transport` interface in firmware, one implementation (FR-061)
-- [ ] Buttons → `tama/dev/<id>/event` with ULID and timestamp (FR-013)
+- [ ] Buttons → `obp/body/<id>/event` with ULID and timestamp (FR-013)
 - [ ] The TUI from Phase 0b sees the device's events, and vice versa — one
       pet, two bodies (FR-120, FR-126)
 - [ ] NVS cache and DEGRADED mode (FR-040, FR-041) — unplug the daemon and
@@ -104,7 +104,7 @@ Telegram, and killing the pod does not kill the pet.
 
 ## Phase 2 — the pet speaks
 
-- [ ] `tama/pet/say` with `ttl_s` honoured on the device (FR-032)
+- [ ] `obp/say` with `ttl_s` honoured on the device (FR-032)
 - [ ] Sprite and animation table in flash, driven by ids (FR-031)
 - [ ] Buzzer via LEDC — chirps do more for perceived life than any sprite
 - [ ] Idle behaviour: blinking, drift, the occasional look-around
@@ -143,7 +143,7 @@ stop whenever it stops being fun.
       (FR-103)
 - [ ] **MCP client**: the daemon reaches MCP servers itself, one call per
       utterance (FR-150, FR-151)
-- [ ] **MCP server** `tamalab-mcp`: pet state and interactions as tools, so a
+- [ ] **MCP server** `obp-mcp`: pet state and interactions as tools, so a
       coding agent can be a caretaker (FR-150, FR-152, FR-153)
 - [ ] If deploying beside agents in a cluster, follow the egress precedent
       rather than opening anything inbound (NFR-021, [deployment](architecture/deployment.md))

@@ -13,13 +13,13 @@ prerequisite. Nobody should need a rack to keep a Tamagotchi alive.
 ```mermaid
 flowchart TB
     subgraph S1["Solo — no container at all"]
-        T1["tamalab tui --solo<br/>core in-process · SQLite file"]
+        T1["obp tui --solo<br/>core in-process · SQLite file"]
     end
 
     subgraph S2["One container — the default"]
         D2["pet-daemon"]
         B2["mosquitto"]
-        V2[("volume<br/>tamalab.db")]
+        V2[("volume<br/>obp.db")]
         D2 --- B2
         D2 --- V2
     end
@@ -46,7 +46,7 @@ flowchart TB
 | Hardware body | No | Yes | Yes |
 | Telegram | No | Yes | Yes |
 | Survives closing the laptop | No | If the host is always on | Yes |
-| Command to start | `uvx tamalab tui --solo` | `docker compose up -d` | `kubectl apply -f` |
+| Command to start | `uvx obp tui --solo` | `docker compose up -d` | `kubectl apply -f` |
 
 **One image serves all three** (FR-164). Moving between them is a matter of
 where the volume lives and which adapters are enabled — never a different
@@ -59,20 +59,20 @@ services:
   broker:
     image: eclipse-mosquitto:2
     volumes: ["./mosquitto:/mosquitto/config"]
-  tamalab:
-    image: ghcr.io/jcarranz97/tamalab:latest
+  obp:
+    image: ghcr.io/jcarranz97/open-body-protocol:latest
     depends_on: [broker]
     environment:
-      TAMALAB_BROKER: mqtt://broker:1883
-      TAMALAB_TZ: Europe/Madrid          # the sim sleeps 23:00–07:00 local
-    volumes: ["tamalab-data:/data"]
-volumes: { tamalab-data: {} }
+      OBP_BROKER: mqtt://broker:1883
+      OBP_TZ: Europe/Madrid          # the sim sleeps 23:00–07:00 local
+    volumes: ["obp-data:/data"]
+volumes: { obp-data: {} }
 ```
 
 **A broker ships in the reference compose file** (FR-163). Requiring people
 to stand up Mosquitto before they can have a pet would lose most of them at
 step one, and a broker with one publisher and two subscribers costs a few
-megabytes. If you already run one, point `TAMALAB_BROKER` at it and delete
+megabytes. If you already run one, point `OBP_BROKER` at it and delete
 the service.
 
 Everything else is optional. With no `TELEGRAM_BOT_TOKEN` there is no
@@ -100,7 +100,7 @@ naively written simulation: close the lid at 18:00, open it at 09:00, and a
 tick-counting pet has either missed 900 ticks or died.
 
 **This design is already immune**, because decay is computed from elapsed
-time rather than accumulated ticks ([simulation](simulation.md)):
+time rather than accumulated ticks ([behaviour packs](behaviour-packs.md)):
 
 ```mermaid
 sequenceDiagram

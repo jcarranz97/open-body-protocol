@@ -1,3 +1,3 @@
-# TAMALAB Agent Instructions
+# OBP Agent Instructions
 
 @AGENTS.md

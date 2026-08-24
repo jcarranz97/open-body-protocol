@@ -50,7 +50,7 @@ you read only two things here, read the first two.
   OpenCode, Cursor and other MCP clients drive the pet's reactions through an
   MCP server. Substantially the same idea as
   [MCP § inbound](architecture/mcp.md#inbound-the-daemon-as-an-mcp-server),
-  already built. Read it before writing `tamalab-mcp`.
+  already built. Read it before writing `obp-mcp`.
 - **`geeks-accelerator/animal-house-ai-tamagotchi`** — MIT, tiny, and sharply
   framed: *"Tamagotchi for AI agents"*, delivered purely as an MCP server
   with no HTTP at all. **The pet is the tool surface and the agent is the
@@ -60,7 +60,7 @@ you read only two things here, read the first two.
 - **Claude Code Channels** — a first-party extension point where *a channel
   is an MCP server* pushing external events into a running session, with
   Telegram and Discord plugins shipped and a documented build-your-own path.
-  A "TAMALAB channel" is a legitimate design rather than a hack.
+  A "OBP channel" is a legitimate design rather than a hack.
 - **[`petdex`](https://github.com/crafter-station/petdex)** — not a pet
   project but a **sprite format**: `pet.json` plus a spritesheet of 192×208
   cells over nine named states, with a public gallery and a generator. Nous
@@ -76,7 +76,7 @@ you read only two things here, read the first two.
     or the agent's behavior"*. No stats, no persistence, no tick, no tools,
     and no route on its HTTP API. What Hermes usefully offers this project is
     an **OpenAI-compatible API server**, not a pet
-    ([brain](architecture/brain.md#which-harness)).
+    ([brain](architecture/brain-contract.md#the-four-kinds)).
 
 ## Embodied companions
 

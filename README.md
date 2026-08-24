@@ -1,94 +1,87 @@
-# TAMALAB
+# OBP
 
-**TAMALAB** is a desk pet whose brain, memory and personality live in a
-container — **one container and one volume, on whatever machine you have**: a
-laptop, a mini PC, a Raspberry Pi, or a homelab if you run one. What you look
-at is a **body**, and there are three, none of them primary:
+**OBP connects a brain to a body.**
 
-| Body | What it is |
-|---|---|
-| **Device** | An ESP32-S3 with a screen, buttons, a buzzer and push-to-talk voice |
-| **Terminal** | A Python + [Rich](https://rich.readthedocs.io/) TUI, for a pet in a pane next to your work |
-| **Telegram** | The same pet, as text, on your phone |
+The brain is an AI agent — Claude, a local Qwen or Gemma, OpenClaw, Hermes,
+OpenCode. The body is whatever hardware someone built: a terminal window, a
+screen and a speaker, a 3D-printed crab with servos, a commercial robot that
+adopts the contract.
 
-**The hardware is optional, and so is the infrastructure.** A pet with no
-ESP32 is not a lesser pet, just one with fewer bodies — and the smallest
-install is not a container at all:
+Neither is ours. The standardised way to marry them is.
 
-```bash
-uvx tamalab tui --solo     # a whole pet: no container, no broker, no keys
-docker compose up -d       # the normal install: daemon + broker, one volume
+```text
+  any brain              obp                any body
+ ───────────      ───────────────      ─────────────────
+  Claude       ◄─►  identity        ◄─►  terminal
+  local model       memory               ESP32 / Pico
+  OpenClaw          translation          servos, wheels, claws
+  Hermes            presence             a commercial robot
 ```
 
-See [deployment](docs/architecture/deployment.md) for what a host actually
-needs (spoiler: one core, 256 MB, no inbound ports).
+A body **describes its own abilities** — *"I can `move(direction,
+distance_cm)` and `set_brightness(level: 0–100)"*, with JSON Schema — and the
+daemon turns that into verbs the brain can call. Nobody teaches the daemon
+what wheels are.
 
-Four ideas hold it together:
+> **Status: architecture, with the first claim tested.** There is no
+> `daemon/` yet. There *is* a working
+> [experiment](experiments/001-pico-usb-body/): a Raspberry Pi Pico
+> describing itself to a host that had never met it, over a bare USB cable,
+> in two firmware languages.
 
-- **The daemon owns the truth.** The ESP32 holds a cached copy only. Reflash
-  it, unplug it, replace it — the pet is unaffected.
-- **The simulation is deterministic and LLM-free.** Hunger and mood decay are
-  a pure function of elapsed time and the event log. The pet works with the
-  brain unplugged; the LLM adds personality, never state.
-- **The brain is a config value.** Local (Qwen via Ollama), cloud (Claude, or
-  anything OpenAI-compatible), or none at all — behind one narrow interface,
-  with a canned-line table as the permanent last fallback.
-- **Bodies are clients of one protocol.** Same events, same ULIDs, same
-  TTLs, whether the face is drawn in flash or in characters. A fourth body —
-  a web dashboard, an e-ink frame — needs no change in the daemon.
+## The idea in one table
 
-> **Status: Phase 0 — design only.** This repository currently contains
-> documentation and no code. The architecture is being written first,
-> deliberately: see [`docs/`](docs/).
+| | Plugs in | Must do |
+|---|---|---|
+| [Body port](docs/architecture/body-contract.md) | anything physical or rendered | announce itself, describe its verbs, accept intents, report honestly |
+| [Brain port](docs/architecture/brain-contract.md) | any model or agent harness | take context, return a decision |
+| The daemon | — | hold identity and memory, translate, stay out of the way |
+
+## Topology is a binding, not an architecture
+
+| Where things run | Binding |
+|---|---|
+| All in one box — Jetson, mini PC, Pi, actuators on USB | stdio subprocess, no broker |
+| One box, split processes | unix socket / localhost |
+| Brain on a PC, body over Wi-Fi | MQTT |
+| No hardware at all | in-process |
+
+A robot with the model inside its own chassis and the network unplugged is a
+config file, not a fork.
 
 ## Documentation
 
-The docs are [MkDocs Material](https://squidfunk.github.io/mkdocs-material/),
-run through [uv](https://docs.astral.sh/uv/). There is no virtualenv to
-create, activate or remember:
+[MkDocs Material](https://squidfunk.github.io/mkdocs-material/), run through
+[uv](https://docs.astral.sh/uv/) — no virtualenv to create or remember:
 
 ```bash
 uvx --with mkdocs-material mkdocs serve    # http://127.0.0.1:8000
 ```
 
-`uvx` resolves the toolchain into a cached throwaway environment — a couple
-of hundred milliseconds after the first run — and nothing is installed into
-your Python or into this repo. If you would rather have `mkdocs` on your
-`PATH` permanently:
-
-```bash
-uv tool install mkdocs --with mkdocs-material
-```
-
-`mkdocs build --strict` is what CI runs on every pull request; pushes to
-`main` deploy to GitHub Pages via `.github/workflows/deploy-docs.yml`, which
-uses the same `uvx` invocation.
-
 | Document | What it covers |
 |---|---|
-| [Home](docs/index.md) | What the pet is and how the pieces fit |
-| [Roadmap](docs/roadmap.md) | Five phases, each independently playable |
-| [Requirements](docs/requirements.md) | Numbered `FR`/`NFR` requirements the architecture cites |
-| [Open Questions](docs/open-questions.md) | Decisions to make before Phase 0 |
-| [Architecture](docs/architecture/overview.md) | Protocol, simulation, brain, voice, firmware, hardware |
-| [Terminal body](docs/architecture/tui.md) | The no-hardware path, and the contract any new body implements |
-| [Original Brief](docs/brief.md) | The seed document, kept verbatim |
+| [Overview](docs/architecture/overview.md) | The shape, in one page |
+| [Body contract](docs/architecture/body-contract.md) | The specification — read this to build a body |
+| [Brain contract](docs/architecture/brain-contract.md) | Plugging in a model or a harness |
+| [Identity & memory](docs/architecture/identity.md) | Who owns the character, and when |
+| [Behaviour packs](docs/architecture/behaviour-packs.md) | Optional behaviour, including a Tamagotchi |
+| [Deployment](docs/architecture/deployment.md) | One container, on whatever machine you have |
+| [Experiments](experiments/) | What has been tried, and what it changed |
+| [Prior art](docs/prior-art.md) | Who else is doing this, with licences |
 
 ## Planned layout
 
-Nothing below exists yet. It is here so the docs can refer to it.
+Nothing below exists yet.
 
 ```text
-daemon/      Python + SQLite. Owns state, runs the sim tick, hosts the brain,
-             the Telegram bot and the event webhook.
-client/      The body half — transport, state cache, event queue, TTLs.
-             Importable by any body; the TUI is its reference consumer.
-tui/         The terminal body. Rich, plus a small raw-mode key reader.
-firmware/    ESP32-S3. Display, buttons, buzzer, I2S mic + speaker.
+daemon/      Python + SQLite. Registry, presence, translation, packs.
+client/      The body half — transports, descriptors, presence.
+bodies/      Reference bodies: terminal, ESP32, Pico.
+packs/       Behaviour packs, including the Tamagotchi one.
+experiments/ Runnable answers to single questions.
 docs/        These documents.
 ```
 
 ## License
 
-[MIT](LICENSE). The design documents and, when they exist, the daemon and
-firmware are free to use, fork and adapt.
+[MIT](LICENSE).

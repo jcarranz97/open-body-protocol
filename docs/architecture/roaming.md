@@ -12,7 +12,7 @@ that rather than fighting it.
 ## The core trick: the simulation is a pure function of time
 
 Decay depends only on `elapsed_seconds` and the event log
-([simulation](simulation.md)). So the device and the server can compute **the
+([behaviour packs](behaviour-packs.md)). So the device and the server can compute **the
 same state independently**, with no chatter.
 
 - The server is authoritative. The device runs the identical decay function
@@ -179,7 +179,7 @@ Custom 128-bit service. The device is the *peripheral*, the phone the
 
 - Negotiate the MTU up to 247 bytes. The state JSON is ~400 and will not fit:
   **use the packed binary form for BLE and keep JSON for MQTT**, with the
-  daemon translating ([protocol](protocol.md) → *The packed form*). Packed
+  daemon translating ([bindings](bindings.md) → *The packed form*). Packed
   state is ~24 bytes; only `line` needs real text, and 140 chars fits in one
   MTU.
 - The `event_out` notification is what wakes the iOS app. Keep the pet
@@ -227,8 +227,8 @@ Assume the keychain will be left in a taxi.
 
 - **Per-device credentials.** A unique MQTT user/password or, better, an mTLS
   client certificate. Never the same secret as the desk unit.
-- **Broker ACLs.** The device may publish only to `tama/dev/<its-own-id>/#`
-  and subscribe only to `tama/pet/#`.
+- **Broker ACLs.** The device may publish only to `obp/body/<its-own-id>/#`
+  and subscribe only to `obp/#`.
 - **Revocation.** One command in the daemon kills a device's cert and
   rotates. Test it before you need it.
 - **Do not put the main WiFi PSK on it.** A separate IoT SSID, or
@@ -251,7 +251,7 @@ the phone writes the time on every connect.
 - **Keychain** — deep-sleeping, offline-first, e-paper or small OLED, syncs
   opportunistically.
 
-Both subscribe to `tama/pet/state`. The daemon tracks which body is *active*
+Both subscribe to `obp/state`. The daemon tracks which body is *active*
 (most recent event wins) and routes `say` there, so the pet feels like it
-**moved** rather than being duplicated. A `tama/pet/presence` topic would let
+**moved** rather than being duplicated. A `obp/presence` topic would let
 the desk unit show an empty room while the owner is out.

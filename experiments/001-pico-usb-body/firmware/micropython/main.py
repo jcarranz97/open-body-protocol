@@ -1,4 +1,4 @@
-"""TAMALAB body contract on a Raspberry Pi Pico (MicroPython).
+"""OBP body contract on a Raspberry Pi Pico (MicroPython).
 
 Copy this to the Pico as main.py. It speaks newline-delimited JSON-RPC 2.0
 over the USB CDC serial link -- the same messages host/fake_body.py speaks

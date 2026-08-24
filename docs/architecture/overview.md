@@ -1,181 +1,128 @@
-# Architecture Overview
+# Architecture overview
 
-Where the line between the body and the brain falls, and why. Every other
-page in this section is a consequence of this one.
-
-## The shape
+Two ports and a small daemon between them. Every other page is a
+consequence of this one.
 
 ```mermaid
-flowchart LR
-    subgraph Device["ESP32-S3 · the body"]
-        direction TB
-        T["Transport interface"]
-        R["render loop<br/>sprites in flash"]
-        Q["event queue<br/>ULID · NVS"]
+flowchart TB
+    subgraph BrainSide["brain port"]
+        API["a model API"]
+        LOCAL["a local model"]
+        HARN["a harness<br/>OpenClaw · Hermes · OpenCode"]
+        CAN["canned"]
     end
 
-    subgraph Pod["pet-daemon · one container, any machine"]
-        direction TB
-        ADP["MQTT adapter"]
-        BUS["internal event bus"]
-        CORE["core<br/>sim · state · memory"]
+    subgraph Daemon["obp daemon — one container, one volume"]
+        BUS["event bus"]
+        CORE["core<br/>registry · presence · translation"]
+        ID["identity & memory<br/>(daemon mode only)"]
+        PACKS["behaviour packs<br/>optional"]
         STORE[("SQLite")]
-        BR["brain router"]
-        FACES["Telegram · webhook · WSS audio"]
     end
 
-    Device <-- "MQTT/TLS" --> ADP
-    Device <-- "WSS · audio only" --> FACES
-    ADP <--> BUS
-    FACES <--> BUS
-    BUS <--> CORE
-    CORE <--> STORE
-    CORE --> BR
-    BR --> CORE
+    subgraph BodySide["body port"]
+        TERM["terminal"]
+        MCU["ESP32 · Pico"]
+        ROBOT["servos · wheels · claws"]
+        TG["Telegram"]
+    end
+
+    BrainSide <--> CORE
+    CORE <--> BUS
+    BUS <--> BodySide
+    CORE --- ID
+    CORE --- PACKS
+    CORE --- STORE
 
     classDef core fill:#4f46e5,stroke:#3730a3,color:#fff
-    class CORE,BUS core
+    class CORE core
 ```
 
-Read it as three rings. The **core** knows about a pet, its stats and its
-event log, and nothing about MQTT, Telegram or HTTP. The **bus** carries
-events in and `state`/`say` out. Everything else is an **adapter** at the
-edge, and adding one is additive: Telegram was the first, MQTT the second,
-the terminal body rides the second one for free, a BLE relay would be the
-third (v2), a web dashboard the fourth.
+## The three rings
 
-That layering is not decoration. It is what makes Phase 0 — a pet that is
-playable on Telegram with no hardware at all — the same code as Phase 1
-rather than a throwaway prototype (FR-002, FR-060).
+**The core** knows about bodies, their verbs, and which of them exist right
+now. It knows nothing about MQTT, USB, Telegram or HTTP.
 
-## Bodies
+**The bus** carries events in and decisions out.
 
-A **body** is anything that renders the pet and reports events. There are
-three in v1 and none of them is primary:
+**Adapters** sit at the edge and are the only code that knows a wire format.
+Adding one is additive: a serial adapter, an MQTT adapter, a Telegram
+adapter, a BLE relay later.
 
-| Body | Transport | Renders | Inputs |
-|---|---|---|---|
-| ESP32-S3 desk unit | MQTT + WSS audio | Sprites in flash | Buttons, IMU, push-to-talk |
-| Terminal ([TUI](tui.md)) | MQTT, or an in-process bus in solo mode | Rich, art in the client | Keypresses, a text prompt |
-| Telegram | Bot API | Text | Commands, free text |
+That layering is what makes the [topologies](deployment.md) work. A body on
+the end of a USB cable and a body across a Wi-Fi network reach the same core
+through different adapters, and the core cannot tell which.
 
-They differ in medium and in `caps`, never in contract: same events, same
-ULIDs, same TTLs, same "the daemon owns the truth" rule (FR-120). Adding a
-fourth costs nothing in the core (FR-064), which is what makes this a
-framework rather than three programs sharing a broker — the checklist is in
-[the TUI page](tui.md#writing-another-body).
+## What each side owes the other
 
-**The hardware is therefore optional.** A user with only a terminal has the
-whole pet; a user with only Telegram has it too, minus a face. That is not a
-concession, it is the point of putting the truth on a server.
-
-## What runs where
-
-| Concern | Body | Daemon |
+| | The body promises | The brain promises |
 |---|---|---|
-| Authoritative stats, mood, age | — | ✔ |
-| Event log, memory, journal | — | ✔ (durable) |
-| Queue of unsent events | ✔ (NVS ring buffer, or a file) | — |
-| Art — sprites, ASCII frames | ✔ (flash, or the client package) | — |
-| Choosing *which* art | — | ✔ (`expression`) |
-| LLM calls | — | ✔ |
-| STT / TTS | — | ✔ |
-| Local decay while offline | ✔ (prediction only) | ✔ (truth) |
-| Secrets (bot token, API keys) | — | ✔ |
+| Describes itself | verbs with JSON Schema, honest capabilities | — |
+| Accepts | intents, at conversational rate | context, including what verbs exist |
+| Returns | a readable result, success or failure | a short decision, validated |
+| On failure | keeps its reflexes, keeps working | falls through to the next provider |
+| Never | invents a verb, takes raw motor commands | assumes a body exists |
 
-A body computes decay only as a *prediction* so the face keeps moving
-while disconnected. On reconnect the server's state overwrites it silently —
-there is no merge, ever (FR-023). The device's only real contribution is its
-timestamped event log.
+The last cell in each column is the load-bearing one. **A body must work
+when the brain is gone** — it keeps its reflexes and its local behaviour.
+**A brain must work when no body exists** — the terminal-only install is not
+a degraded mode, it is the common case.
 
-## Why MQTT for control
+## What the daemon owns
 
-- **Retained messages.** The device gets the current state the instant it
-  subscribes, with no request/response round trip and no bespoke "sync on
-  boot" code path.
-- **Last Will and Testament.** "The body went offline" comes free, on both
-  sides — the daemon publishes its own LWT too, so the device can show a
-  disconnected badge instead of pretending.
-- **Pub/sub.** A second body, a web dashboard or a desk lamp that mirrors
-  the mood costs nothing to add.
-- **A tiny client.** The ESP32 footprint is small enough to leave room for
-  audio buffers.
+Deliberately little, and all of it is the part that would otherwise be
+duplicated in every brain and every body:
 
-## Why not MQTT for audio
+| Concern | Why it is here |
+|---|---|
+| **Body registry**, keyed on hardware id | Survives reflashing and firmware language changes ([experiment 001](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/001-pico-usb-body)) |
+| **Presence** | Only the daemon sees all the bodies; when one goes, its verbs go with it |
+| **Translation** | Body verbs become brain tools, in whatever dialect that brain speaks |
+| **Identity and memory** | In daemon mode only — a harness that has its own keeps it ([identity](identity.md)) |
+| **The interruption budget** | Otherwise every pack and every harness invents its own |
+| **The event log** | The record of what actually happened |
 
-MQTT is a message bus, not a stream. Audio wants back-pressure, ordered
-binary frames and a session that ends. Push-to-talk opens a WebSocket on
-button-down and closes it after playback — roughly 200 ms of setup on a LAN,
-hidden behind the first syllable ([voice](voice.md)).
+**SQLite, not a database server.** One file, one volume, and the deciding
+argument is [deployment](deployment.md): a server process would put a floor
+under where this can run, and a Raspberry Pi is a supported host.
 
-This split — control over MQTT, audio over its own channel — is the same one
-`xiaozhi-esp32` makes, and it is why the firmware puts a `Transport`
-interface in front of both from day one (FR-061).
+## Why the body describes itself
 
-## The daemon's internals
+The alternative — a catalogue of known device types in the daemon — fails
+the moment someone builds something nobody anticipated, which is the entire
+premise.
 
-One process, five concerns:
+So a body arrives and says what it can do, with schemas. The daemon sorts
+the verbs deterministically, namespaces them per body, and hands them to
+whichever brain is connected. **Nobody teaches the daemon what a claw is.**
 
-| Concern | Job | Notes |
-|---|---|---|
-| `sim` | 60 s tick; apply decay, derive mood, detect transitions | Pure function of time + events ([simulation](simulation.md)) |
-| `store` | SQLite: `pets`, `events`, `memories`, `journal`, `devices`, `llm_calls` | One file, WAL mode |
-| `bus` | Fan events in, fan `state`/`say` out | In-process; async queue |
-| `brain` | Turn a trigger + context into one JSON object | Routed and rate-limited ([brain](brain.md)) |
-| `adapters` | MQTT, Telegram, `POST /event`, WSS audio | The only code that knows a wire format |
-
-**The core is importable, not just runnable.** `tamalab tui --solo` runs
-exactly this core in-process, with a direct bus connection where the MQTT
-adapter would be, against a SQLite file on the user's laptop (FR-122). It is
-the same simulation code — not a second implementation, which is the only
-version of this idea worth having (FR-123). If the core ever needs to know it
-is running inside a TUI, the rings have leaked.
-
-**SQLite, not Postgres.** The deciding argument is
-[deployment](deployment.md): a database server is more infrastructure than
-the thing it stores, and it would put a floor under where the pet can live.
-One pet, one owner, a write every 60 seconds and a
-handful of reads. A database server would be more infrastructure than the
-thing it stores. It is also what makes the daemon a single container with a
-single volume, which matters for a project whose failure mode is *the owner
-gets bored of operating it*.
-
-**The device registry is a table from day one** (FR-062). v1 has one row.
-Adding the keychain in v2 should be an `INSERT`, not a refactor — topics
-already carry `<id>` and credentials are already per-device.
-
-## The five v1 decisions that keep v2 cheap
-
-All nearly free now, all expensive to retrofit. They are listed here because
-they cut across every page.
-
-1. **Abstract the transport in firmware** (FR-061). One implementation in
-   v1, `MqttTransport`. `BleTransport` in v2 changes nothing above that
-   line. The single highest-leverage decision in the design.
-2. **Keep the daemon transport-agnostic** (FR-060). MQTT is an adapter, not
-   a layer woven through the logic.
-3. **Design payloads as if the MTU were 247 bytes** (FR-063). BLE will cap
-   you there; the `state` JSON is ~400. Define the packed binary form now
-   and write the JSON↔packed codec in Phase 1 even though v1 never sends it.
-4. **Never let firmware assume it is connected** (FR-041). DEGRADED mode
-   ships in Phase 1. In v1 it is a nicety; in v2 it is the normal state.
-5. **Do not hardcode one device** (FR-062).
-
-The one thing safely deferred is **power**: deep sleep, wake sources and
-duty cycling touch only the firmware's main loop and disturb no protocol.
+This has been tested rather than assumed: a Raspberry Pi Pico, in two
+firmware languages, describing five verbs to a host that had never met it,
+over a bare USB cable with no broker and no configuration
+([body contract](body-contract.md)).
 
 ## Failure behaviour
 
-The project's real quality bar is what happens when things are broken,
-because a desk pet that goes blank when a container restarts stops being a
-creature and becomes a status light.
+The real quality bar, because a thing that goes blank when a container
+restarts is a status light rather than a companion.
 
-| Broken | What the pet does |
+| Broken | What happens |
 |---|---|
-| Daemon restarts | Device keeps animating from NVS, shows a disconnected glyph, queues events, flushes on reconnect |
-| WiFi drops | Same, plus reconnect backoff |
-| LLM provider down or slow | Falls through the route chain, ends at a canned line within the timeout |
-| STT/TTS times out | Confused animation and a canned line — never a hang |
-| Broker down | Device DEGRADED, daemon keeps simulating; state reconciles on reconnect |
-| Device unplugged overnight | Stale `say` messages expire on `ttl_s`; no backlog replay |
-| No hardware at all | Terminal and Telegram bodies are unaffected — the pet is complete without an ESP32 |
+| Daemon restarts | Bodies keep their local behaviour; presence re-establishes; retained state replays where the binding supports it |
+| A body unplugs | Its verbs leave the brain's tool set; a call already in flight returns a readable "not connected" result, never a hang |
+| The brain is slow or down | Falls through the provider chain, ending at canned. No user-visible path blocks on a model |
+| A harness changes its API | Only the harness adapter breaks; bodies and packs are untouched |
+| No body at all | The terminal install works completely |
+| No network at all | An all-in-one deployment is unaffected — model, daemon and actuators are on one box |
+
+## The decisions that keep this cheap to extend
+
+1. **Transport is a binding.** MQTT is one adapter, not the architecture. A
+   USB body must never need a broker.
+2. **The body owns the how.** Intents in, execution and safety local.
+3. **Bodies are one-per-registry-row from day one.** Adding a second is an
+   `INSERT`, not a refactor.
+4. **Presence is an abstraction**, implemented per binding, because the
+   elegant MQTT form does not generalise to a cable.
+5. **Anything opinionated is a [pack](behaviour-packs.md).** The core
+   connects; it does not decide what the thing wants.

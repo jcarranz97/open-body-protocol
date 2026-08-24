@@ -1,139 +1,121 @@
-# TAMALAB Documentation
+# OBP
 
-**TAMALAB** is a desk pet whose brain runs in a container. Everything that
-decides *who the pet is* — its stats, its memory, its personality, its
-opinions about your failing backups — lives there: **one container, one
-volume, on whatever machine you have.** A laptop, a spare mini PC, a
-Raspberry Pi, or a homelab cluster if you happen to run one
-([deployment](architecture/deployment.md)). What you see is a **body**, and
-there are three of them: an ESP32-S3 with a
-screen, buttons and a push-to-talk microphone; a Telegram bot; and a
-terminal application built with Rich.
+**OBP connects a brain to a body.**
 
-It is a Tamagotchi in the shape it always should have had: the toy is the
-face, not the computer. That is also why **the hardware is optional** — a
-pet with no ESP32 is not a degraded pet, it is the same creature with one
-fewer body ([terminal](architecture/tui.md)).
+The brain is an AI agent — Claude, a local Qwen or Gemma, OpenClaw, Hermes,
+OpenCode, anything that can hold a conversation and call a tool. The body is
+whatever hardware someone built: a terminal window, a screen and a speaker,
+a 3D-printed crab with servos, a commercial robot that adopts the contract.
 
-!!! info "Phase 0 — design only"
-    This repository contains documentation and no code. There is no
-    `daemon/` and no `firmware/` yet, deliberately: the
-    [roadmap](roadmap.md) starts with a phase that is playable on Telegram
-    alone, costs nothing, and is the one most likely to kill the project.
-    The [original brief](brief.md) is kept verbatim as the seed document.
-
-## How it fits together
+Neither is ours. **The standardised way to marry them is.**
 
 ```mermaid
-flowchart TB
-    subgraph Body["ESP32-S3 — a body"]
-        UI["display · buttons · buzzer"]
-        AUD["I2S mic + speaker"]
-        NVS[("NVS cache<br/>last state")]
+flowchart LR
+    subgraph Brains["Brains — bring your own"]
+        B1["Claude / any API"]
+        B2["Local model<br/>Qwen · Gemma"]
+        B3["A harness<br/>OpenClaw · Hermes · OpenCode"]
     end
 
-    TUI["Terminal body<br/>Python + Rich"]
+    D["obp<br/>identity · memory · translation"]
 
-    subgraph Daemon["pet-daemon — one container, anywhere"]
-        SIM["sim tick<br/>cron 60 s"]
-        DB[("SQLite<br/>state · events · memory")]
-        BRAIN["brain<br/>pluggable"]
-        VOICE["STT / TTS<br/>pluggable"]
+    subgraph Bodies["Bodies — bring your own"]
+        Y1["terminal"]
+        Y2["ESP32 · Pico<br/>screen · speaker"]
+        Y3["something with servos"]
     end
 
-    CANNED["canned lines"]
-    LOCAL["local LLM<br/>Qwen via Ollama"]
-    CLOUD["cloud LLM<br/>Claude"]
-    TG["Telegram bot"]
-    HOOK["homelab webhooks<br/>restic · CI · disk"]
-
-    UI -- "MQTT: event" --> Daemon
-    Daemon -- "MQTT: state, say, cmd" --> UI
-    TUI <-- "MQTT — same contract" --> Daemon
-    AUD <-- "WSS: PCM in / PCM out" --> VOICE
-    Daemon -. "retained state" .-> NVS
-
-    SIM --> DB
-    DB --> BRAIN
-    VOICE --> BRAIN
-    BRAIN --> CANNED
-    BRAIN --> LOCAL
-    BRAIN --> CLOUD
-    TG <--> Daemon
-    HOOK --> Daemon
+    B1 --- D
+    B2 --- D
+    B3 --- D
+    D --- Y1
+    D --- Y2
+    D --- Y3
 
     classDef core fill:#4f46e5,stroke:#3730a3,color:#fff
-    class SIM,DB,BRAIN core
+    class D core
 ```
 
-## The three rules everything else follows from
+!!! info "Status — architecture, with the first claim tested"
+    There is no `daemon/` yet. There *is* a working
+    [experiment](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/001-pico-usb-body):
+    a Raspberry Pi Pico describing its own abilities to a host that had never
+    met it, over a bare USB cable, in two firmware languages. The pages here
+    cite it rather than speculate.
 
-**The daemon owns the truth.** The ESP32 holds a cached copy so it can keep
-animating while the pod restarts. It never computes authoritative state and
-never holds history. Reflashing the device does not reset the pet — which is
-the entire reason the state lives on a server at all.
+## The two ports
 
-**The simulation is deterministic and needs no LLM.** Hunger, energy and
-mood decay are a pure function of elapsed time and the event log
-([simulation](architecture/simulation.md)). The pet is fully playable with
-the brain switched off; the LLM adds *personality*, never state. It also
-means device and server can compute the same state independently, which is
-what makes an offline body possible.
+Everything in this project is one of three things: the **body port**, the
+**brain port**, or the small amount of daemon that sits between them.
 
-**The brain is a config value.** Local, cloud, or none — behind one narrow
-interface that asks for a single small JSON object
-([brain](architecture/brain.md)). A canned-line table is the zeroth provider
-and the permanent last fallback, so no path through the system can hang the
-device waiting on a model.
-
-## Scope
-
-**v1 is WiFi-only, home network, USB-powered.** The device lives on the LAN
-and talks MQTT to the daemon directly. No VPN, no rendezvous broker, no
-cellular, no BLE, no battery. Off the LAN it goes into DEGRADED mode and
-keeps animating until it comes home.
-
-| In v1 | Not in v1 |
-|---|---|
-| A face that reacts, buttons, a buzzer | On-device LLM inference |
-| Persistent state that survives reflashing | Battery, portability, roaming |
-| Telegram as a second face for the same pet | BLE, cellular, WireGuard |
-| A terminal body, so hardware is optional | A desktop GUI application |
-| Push-to-talk voice (last feature built) | Wake words, always-on listening |
-| Reactions to real events from the things you run | Multi-user, multi-pet |
-
-Voice is a v1 feature but the *last* one built, and it forces the board
-choice up front: buy the ESP32-S3 with PSRAM in Phase 1 even though nothing
-uses the mic until Phase 5 ([hardware](architecture/hardware.md)).
-
-**v2 is the BLE keychain.** Everything in [roaming](architecture/roaming.md)
-is deferred — it is documented now only for the handful of v1 decisions that
-keep that door open, which are cheap now and expensive to retrofit.
-
-## Technology
-
-| Component | Choice | Why |
+| | What plugs in | What it must do |
 |---|---|---|
-| Daemon | Python 3.13 + SQLite | One container, one file, no server to operate |
-| Control transport | MQTT (Mosquitto) | Retained state, LWT, pub/sub, tiny client |
-| Audio transport | WebSocket over TLS | MQTT is the wrong shape for streams |
-| Brain | Pluggable: canned / OpenAI-compatible / Anthropic | Local privacy or cloud quality, by config |
-| Voice | Pluggable: faster-whisper + Piper, or cloud | Local-only is a viable full config |
-| Firmware | ESP32-S3, FreeRTOS | PSRAM for audio, two cores, enough GPIO |
-| Second face | Telegram | Already exists, and the pet feels continuous |
-| Third face | Python + Rich TUI | A pet where the work happens; no hardware needed |
-| Documentation | MkDocs Material | Same as `piezario` and `printforhelp` |
+| **[Body port](architecture/body-contract.md)** | Anything physical or rendered | Announce itself, describe its own abilities with schemas, accept intents, report honestly |
+| **[Brain port](architecture/brain-contract.md)** | Any model or agent harness | Take context, return a decision |
+| **The daemon** | — | Hold identity and memory, translate between the two, and stay out of the way |
 
-## Where to start reading
+A body advertises **tools**, not capabilities-by-name. It says *"I can
+`move(direction, distance_cm)` and `set_brightness(level: 0–100)"*, with JSON
+Schema, and the daemon turns that into something the brain can call. Nobody
+teaches the daemon what wheels are.
 
-1. [Architecture overview](architecture/overview.md) — the shape of the
-   system and why the split falls where it does.
-2. [Protocol](architecture/protocol.md) — MQTT topics and the JSON payloads.
-   The contract everything else is written against.
-3. [Terminal body](architecture/tui.md) — the no-hardware path, and the
-   body contract any new face implements.
-4. [Deployment](architecture/deployment.md) — the container, what it needs
-   from a host, and why a homelab is optional.
-5. [Roadmap](roadmap.md) — six phases, each independently playable.
-6. [Open questions](open-questions.md) — what has to be decided before
-   Phase 0, and what can wait.
+## Why this and not the alternatives
+
+The honest version, because the research is uncomfortable and it is better
+stated than discovered later:
+
+- **Agents with a persona, memory and tool use are a commodity.** OpenClaw
+  has 387k stars and a `soul.md`; nanobot, airi and OVOS all ship the same
+  bundle. Building another is not interesting.
+- **Device-as-MCP-server over MQTT already exists too.** `xiaozhi-esp32` has
+  29k stars, MIT, and a servo robot dog in its documentation. This project is
+  the fourth convergent implementation of that idea, which is a *distribution
+  advantage*, not an insight.
+- **What nobody has is the layer that is indifferent to both ends.** Reachy
+  Mini's abstraction covers a simulated Reachy Mini, not a body. Harnesses
+  abstract brains and have no body concept. xiaozhi is one firmware family
+  talking to its own backend. None of them survives "the model is on a Jetson
+  beside the servos" *and* "the model is in a datacentre and the body is on
+  Wi-Fi".
+
+See [prior art](prior-art.md) for who is doing what, with licences.
+
+## Topology is a binding, not an architecture
+
+The same contract has to work at every scale, or the idea is hollow:
+
+| Where things run | Brain | Body | Binding |
+|---|---|---|---|
+| **All in one box** — Jetson, Ryzen AI mini PC, Pi | local model | actuators on USB | stdio subprocess, no broker |
+| **One box, split processes** | local model | local hardware daemon | unix socket / localhost |
+| **Split** | a PC or the cloud | ESP32 over Wi-Fi | MQTT |
+| **Nothing physical** | anywhere | a terminal | in-process |
+
+A robot with the model inside its own chassis and the network unplugged is a
+config file, not a fork ([deployment](architecture/deployment.md)).
+
+## What the daemon actually owns
+
+Very little, deliberately — but the part it owns is the part that makes the
+thing feel continuous:
+
+- **Identity and memory**, when the brain is a raw model. When the brain is a
+  harness that already has a `soul.md` and a memory store, the harness owns
+  them and the daemon steps back. Both modes are supported and the difference
+  is explicit ([identity](architecture/identity.md)).
+- **Translation.** Body tools become brain tools; brain decisions become body
+  intents.
+- **Presence.** Which bodies exist right now, and therefore which tools do.
+- **Behaviour packs**, which are optional and where anything resembling a
+  personality or a pet lives ([behaviour packs](architecture/behaviour-packs.md)).
+
+## Where to start
+
+1. [Overview](architecture/overview.md) — the shape, in one page.
+2. [Body contract](architecture/body-contract.md) — the specification, and
+   the thing to implement if you are building a body.
+3. [Brain contract](architecture/brain-contract.md) — plugging in a model or
+   a harness.
+4. [Deployment](architecture/deployment.md) — where it runs.
+5. [Experiments](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments)
+   — what has actually been tried, and what it changed.

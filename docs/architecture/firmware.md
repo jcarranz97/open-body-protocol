@@ -38,7 +38,7 @@ stateDiagram-v2
 device keeps the last state from NVS, keeps animating, runs the slow local
 decay and shows a small disconnected glyph. User events go into a ring buffer
 (~32 entries) and flush on reconnect — which is why events carry ULIDs and a
-`clock_confident` flag ([protocol](protocol.md)).
+`clock_confident` flag ([bindings](bindings.md)).
 
 It renders from NVS *before the network is up*, so the pet is on screen
 roughly a second after power, not after a WiFi association.

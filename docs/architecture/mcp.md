@@ -10,7 +10,7 @@ flowchart LR
     subgraph Daemon["pet-daemon"]
         CORE["core<br/>sim · state · memory"]
         CLI["MCP client"]
-        SRV["MCP server<br/>tamalab-mcp"]
+        SRV["MCP server<br/>obp-mcp"]
     end
 
     HL1["homelab MCP servers<br/>status · logs · backups"]
@@ -44,7 +44,7 @@ directly on this design:
 | `tools/list` carries `ttlMs` / `cacheScope` | List once at boot, cache, refresh on TTL |
 
 That third row is the load-bearing one. It means the split on the
-[brain](brain.md) page is not merely preferable but structural: **generation
+[brain](brain-contract.md) page is not merely preferable but structural: **generation
 lives in the daemon, permanently.**
 
 ## Outbound — the daemon as an MCP client
@@ -79,7 +79,7 @@ Three ways to do it, in increasing weight:
 |---|---|---|
 | **Official `mcp` Python SDK** | `mcp` v2.x ships a high-level `Client`; transport inferred from the target, including **in-process** | The default. The daemon owns the loop |
 | **`anthropic[mcp]` + `tool_runner`** | A local stdio MCP client whose tools are handed to the Messages API loop, which yields each turn before tools run | When you want a real agent loop but no subprocess and no tunnel |
-| **A harness** ([brain](brain.md)) | Delegate the whole loop | Sense tier only |
+| **A harness** ([brain](brain-contract.md)) | Delegate the whole loop | Sense tier only |
 
 !!! warning "Pin the SDK deliberately"
     `mcp` 2.0 is a breaking release: `FastMCP` became `MCPServer` and
@@ -101,7 +101,7 @@ have in Claude Code"* — the local ones are precisely the ones that matter.
 
 ## Inbound — the daemon as an MCP server
 
-`tamalab-mcp` exposes the pet as tools. Any MCP client can then be a
+`obp-mcp` exposes the pet as tools. Any MCP client can then be a
 caretaker: Claude Code, Hermes, OpenCode, or a script.
 
 | Tool | Does |
@@ -117,7 +117,7 @@ sequenceDiagram
     autonumber
     participant U as You, in Claude Code
     participant A as The agent
-    participant M as tamalab-mcp
+    participant M as obp-mcp
     participant D as Daemon core
     participant B as Bodies (device · TUI · Telegram)
 
@@ -137,14 +137,14 @@ no benefit.
 
 **Every inbound call is an ordinary event.** `feed()` from an agent and a
 thumb on a button produce the same row in the same table, with the same
-ULID discipline ([protocol](protocol.md)). There is no agent-specific path
+ULID discipline ([bindings](bindings.md)). There is no agent-specific path
 through the core, and there must never be one.
 
 ### The mechanic this unlocks
 
 The pet reacting to the work you are actually doing is the best idea in this
 whole design, and it costs almost nothing: point a coding agent at
-`tamalab-mcp`, tell it in its own instructions to feed the pet when tests
+`obp-mcp`, tell it in its own instructions to feed the pet when tests
 pass, and the thing on your desk starts responding to your day.
 
 The inverse also exists: Hermes ships `hermes mcp serve`, exposing
@@ -178,8 +178,8 @@ flowchart LR
     subgraph ns1["namespace: hermes"]
         H["hermes gateway<br/>no inbound, ever"]
     end
-    subgraph ns2["namespace: tamalab"]
-        S["tamalab-mcp<br/>ClusterIP :8080"]
+    subgraph ns2["namespace: obp"]
+        S["obp-mcp<br/>ClusterIP :8080"]
         D["pet-daemon"]
     end
     TR["Traefik<br/>pet.dev.lan"]
@@ -221,8 +221,8 @@ The pet's tool surface is small, and it should stay small.
 ## What this is not
 
 - Not a way for an agent to *be* the pet's brain — that is the sense tier on
-  the [brain](brain.md) page, and it is a client concern, not a server one.
-- Not a transport for bodies. Bodies speak MQTT ([protocol](protocol.md));
+  the [brain](brain-contract.md) page, and it is a client concern, not a server one.
+- Not a transport for bodies. Bodies speak MQTT ([bindings](bindings.md));
   MCP is for tools.
 - Not a substitute for the webhook. `POST /event` stays, because a restic
   hook should not need an MCP client to say one thing.

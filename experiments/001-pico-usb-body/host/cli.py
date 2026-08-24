@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drive a TAMALAB body from the command line.
+"""Drive a OBP body from the command line.
 
     # no hardware at all -- the body is a subprocess speaking the same protocol
     python3 host/cli.py --fake describe
@@ -18,8 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from tamabody import BodyClient, BodyError, SerialTransport, SubprocessTransport  # noqa: E402
-from tamabody.client import render_result  # noqa: E402
+from obpbody import BodyClient, BodyError, SerialTransport, SubprocessTransport  # noqa: E402
+from obpbody.client import render_result  # noqa: E402
 
 
 def parse_arg(pair: str) -> tuple[str, object]:
