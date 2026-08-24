@@ -157,10 +157,45 @@ already configured:
 }
 ```
 
-Verify before starting a session:
+**Start OpenCode from this directory**, or the relative path will not
+resolve. OpenCode finds the config by scanning the project, but runs the
+command against *its own working directory* — so from the repository root
+the same config fails:
+
+```text
+$ cd ~/repos/open-body-protocol && opencode mcp list
+●  ✗ obp failed
+│      MCP error -32000: Connection closed
+
+$ cd experiments/002-agent-drives-body && opencode mcp list
+●  ✓ obp connected
+```
+
+To use it from anywhere, write a config with an absolute path instead:
 
 ```bash
 cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
+python3 - <<'EOF'
+import json, pathlib
+here = pathlib.Path.cwd()
+cfg = {"$schema": "https://opencode.ai/config.json",
+       "mcp": {"obp": {"type": "local", "enabled": True,
+                       "command": ["python3", str(here / "host/obp_mcp.py"),
+                                   "--log", "/tmp/obp-mcp.log"]}}}
+out = pathlib.Path.home() / ".config/opencode/opencode.json"
+existing = json.loads(out.read_text()) if out.exists() else {}
+existing.setdefault("mcp", {}).update(cfg["mcp"])
+existing.setdefault("$schema", cfg["$schema"])
+out.write_text(json.dumps(existing, indent=2))
+print("wrote", out)
+EOF
+```
+
+That merges into the global config, so it applies wherever OpenCode runs.
+
+Verify before starting a session:
+
+```bash
 opencode mcp list
 ```
 

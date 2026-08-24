@@ -56,6 +56,13 @@ project:
 
 `opencode mcp list` shows whether it connected.
 
+**Use absolute paths in either shape.** An agent runs a server command
+against *its own* working directory, not the config file's, so a relative
+path works from one directory and fails from another with nothing more
+informative than `Connection closed`. This is the same class of mistake as
+naming a device node: a value that happens to be right where it was written,
+and wrong everywhere else.
+
 **Do not name a device node in that configuration.** `/dev/ttyACM0` is not an
 identity: a board that re-enumerates becomes `/dev/ttyACM1` and the host is
 left writing into a node that no longer exists. A host **SHOULD** discover
