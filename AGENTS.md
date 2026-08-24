@@ -1,55 +1,67 @@
-# TAMALAB
+# Open Body Protocol (OBP)
 
-**TAMALAB** is an AI Tamagotchi: an ESP32-S3 desk pet whose brain, memory and
-personality run as a container in a homelab, reachable from both the device
-and Telegram. The device is a **body** — display, buttons, buzzer, mic,
-speaker — and nothing else.
+**A specification**: how a body describes itself and is driven. This
+repository is the protocol, its rationale, its conformance rules, and
+reference bodies that prove it.
 
-**Status: Phase 0.** This repository is documentation only. There is no
-`daemon/` and no `firmware/` yet. Do not scaffold either until the
-architecture documents they implement are settled; the whole point of the
-phase order in `docs/roadmap.md` is that Phase 0 is playable on Telegram
-alone and costs nothing.
+**It is not a product.** What decides — which model, what it remembers, who
+it is, how it deploys — is out of scope. That lives in
+[desk-buddy](https://github.com/jcarranz97/desk-buddy).
 
-## The invariants
+## The test for anything added here
 
-These are the load-bearing decisions. Everything else is negotiable; when a
-change would violate one of these, say so rather than working around it.
+*Does this constrain someone implementing a body?*
 
-1. **The daemon owns the truth.** The ESP32 caches the last `state` in NVS so
-   it can keep animating through a pod restart. It never computes
-   authoritative state, never persists history, and never holds a secret
-   worth stealing.
-2. **The simulation is a pure function of elapsed time and the event log**
-   (`docs/architecture/simulation.md`). No LLM appears anywhere in it. This
-   is what makes the offline device and the server agree without merge logic
-   — and what makes the v2 keychain possible at all.
-3. **The device must never wait on the brain.** Every LLM path ends in a
-   timeout and a canned line. `CannedBrain` is the zeroth provider and the
-   permanent fallback, not a stub to be deleted later.
-4. **The brain is provider-agnostic.** The pet asks for one small JSON object
-   (`docs/architecture/brain.md` §Structured output). Which model produces it
-   is a line in `providers.yaml`. Never let a vendor's SDK types leak past
-   the adapter boundary.
-5. **Transport is abstracted on both sides.** Firmware talks to a `Transport`
-   interface, the daemon consumes *events* and emits *state*/*say* over an
-   internal bus with MQTT as an edge adapter. v1 has one implementation each.
-   v2 adds BLE as an addition, not a rewrite.
-6. **Art lives in flash.** The server sends an `expression` and an
-   `animation` id — never sprite data.
-7. **The mic opens only while the push-to-talk button is held.** A firmware
-   invariant, not a policy. Privacy here is structural.
+If yes, it belongs here. If it is about which model thinks, who owns a
+persona, how something deploys, or what a robot should be like, it belongs in
+desk-buddy. That split is why the two repositories exist, and it erodes
+easily.
+
+## Invariants
+
+1. **The body carries the schema.** Never a catalogue of device types in the
+   host.
+2. **Intents down, results up.** The body owns kinematics, timing, limits and
+   reflexes.
+3. **Errors are results**, never transport failures or crashes.
+4. **Transport is a binding.** A USB body must never require a broker.
+5. **Presence is abstract**, with a per-binding implementation. MQTT's
+   retained-message form is the nicest and does not generalise.
+6. **The host sorts verbs and namespaces them.** Bodies cannot be trusted to
+   order their own.
+7. **`userOnly` is a guardrail, not access control.**
+8. **v0 is unstable**, and changes are recorded with the reason.
+
+## Normative language
+
+Requirements use RFC 2119 keywords. **Every normative requirement must appear
+in `docs/spec/conformance.md`**, which is the authoritative list; prose
+elsewhere explains and illustrates, and must not introduce a requirement that
+is not in that table.
+
+## Experiments come before specification
+
+`experiments/` holds runnable answers to single questions, indexed with what
+each one changed. Several requirements exist because an experiment produced
+them — cite the experiment when writing such a rule, and add an experiment
+rather than asserting a claim that could be tested.
 
 ## Documentation
 
 `docs/` is [MkDocs Material](https://squidfunk.github.io/mkdocs-material/),
-laid out like the sibling projects `piezario` and `printforhelp`:
+laid out like the sibling projects `piezario` and `printforhelp`. Drive it
+with [uv](https://docs.astral.sh/uv/) — **do not create a virtualenv or pip
+install anything**:
 
 ```bash
-pip install mkdocs-material
-mkdocs serve                # read locally
-mkdocs build --strict       # what CI runs; broken links fail the build
+uvx --with mkdocs-material mkdocs serve           # read locally
+uvx --with mkdocs-material mkdocs build --strict  # what CI runs; warnings fail it
 ```
+
+The version is deliberately unpinned. Material 9.x already constrains
+`mkdocs<2`, so the announced MkDocs 2.0 plugin breakage cannot reach this
+repo while the major version stays at 9 — if Material ever ships a 10, pin
+it here before finding out the hard way.
 
 - `docs/brief.md` is the **original seed document, kept verbatim**. Treat it
   as a historical record: do not edit it to reflect later decisions. When the
@@ -75,8 +87,8 @@ on them.
 
 | Term | Means |
 |---|---|
-| **body** | A physical device. v1 has one (the desk unit); v2 adds the keychain. |
-| **daemon** | The homelab pod. The pet's brain, memory and authority. |
+| **body** | Anything that renders the pet and reports events: the desk unit, the terminal, Telegram. v2 adds the keychain. Not a synonym for hardware. |
+| **daemon** | The container that owns the core. The pet's brain, memory and authority, wherever it runs. |
 | **state** | The full snapshot of §4.3 — stats, mood, stage. Server→device, retained. |
 | **say** | One utterance plus an expression, animation and sound. Perishable (`ttl_s`). |
 | **event** | Something that happened to the pet: a button, a shake, a voice turn, a webhook. Carries a ULID. |

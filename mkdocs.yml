@@ -1,0 +1,88 @@
+site_name: Open Body Protocol
+site_description: A standard way to connect an AI brain to a physical body
+site_url: https://jcarranz97.github.io/open-body-protocol/
+
+repo_name: jcarranz97/open-body-protocol
+repo_url: https://github.com/jcarranz97/open-body-protocol
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - toc.integrate
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Specification:
+    - Overview: spec/overview.md
+    - Messages: spec/messages.md
+    - Descriptors: spec/descriptors.md
+    - Results & errors: spec/results.md
+    - Presence: spec/presence.md
+    - Bindings: spec/bindings.md
+    - Versioning: spec/versioning.md
+    - Security: spec/security.md
+    - Conformance: spec/conformance.md
+  - Rationale: rationale.md
+  - Implementations: implementations.md
+  - Guides:
+    - Connecting an agent: guides/connecting-agents.md
+  - Open questions: open-questions.md
+  - Prior Art: prior-art.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        # Emit ```mermaid fences as <div class="mermaid">…source…</div> and
+        # render them ourselves (docs/javascripts/mermaid-init.js).
+        #
+        # Material 9.7 also ships a Mermaid integration, which keys on
+        # <pre class="mermaid"><code> (fence_code_format). On the sibling
+        # project (Piezario) it left the diagram host EMPTY — the library
+        # loads, the element is swapped in, and no SVG is ever injected.
+        # Using fence_div_format keeps our markup out of its selector
+        # entirely, so the two cannot fight over the same nodes.
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - footnotes
+  - attr_list
+  - md_in_html
+  - tables
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js
+  - javascripts/mermaid-init.js

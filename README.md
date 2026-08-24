@@ -1,57 +1,79 @@
-# TAMALAB
+# Open Body Protocol (OBP)
 
-**TAMALAB** is a physical desk pet — an ESP32 with a face — whose brain,
-memory and personality live in a container in a homelab. The device is a
-*body*, not a computer: it renders a face, reads buttons and a microphone,
-and caches the last known state so it keeps being charming when the network
-is not. Everything that decides *who the pet is* runs on the server, and is
-reachable from both the device and Telegram.
+**A standard way to give an agent a body.**
 
-Three ideas hold it together:
+A body — a microcontroller, a robot, a terminal window — announces itself,
+**describes its own verbs with JSON Schema**, and executes them. A host
+discovers those verbs at run time and offers them to whatever is deciding.
+Nothing in the host is taught what a claw is.
 
-- **The daemon owns the truth.** The ESP32 holds a cached copy only. Reflash
-  it, unplug it, replace it — the pet is unaffected.
-- **The simulation is deterministic and LLM-free.** Hunger and mood decay are
-  a pure function of elapsed time and the event log. The pet works with the
-  brain unplugged; the LLM adds personality, never state.
-- **The brain is a config value.** Local (Qwen via Ollama), cloud (Claude, or
-  anything OpenAI-compatible), or none at all — behind one narrow interface,
-  with a canned-line table as the permanent last fallback.
+```jsonc
+// host → body
+{"jsonrpc":"2.0","id":1,"method":"body/describe"}
 
-> **Status: Phase 0 — design only.** This repository currently contains
-> documentation and no code. The architecture is being written first,
-> deliberately: see [`docs/`](docs/).
+// body → host: identity, capabilities and verbs, in one round trip
+{"jsonrpc":"2.0","id":1,"result":{"v":0,
+  "body":{"id":"pico-3f5022","fw":"0.1.0","caps":["led","dimmable"]},
+  "tools":[{"name":"set_brightness",
+            "description":"Set how brightly the indicator light glows.",
+            "inputSchema":{"type":"object",
+              "properties":{"level":{"type":"integer","minimum":0,"maximum":100}},
+              "required":["level"]}}]}}
+
+// host → body
+{"jsonrpc":"2.0","id":2,"method":"tools/call",
+ "params":{"name":"set_brightness","arguments":{"level":40}}}
+
+// body → host
+{"jsonrpc":"2.0","id":2,"result":{
+  "content":[{"type":"text","text":"brightness 40%"}],"isError":false}}
+```
+
+## Scope
+
+OBP specifies how a body is **described and driven**. It says nothing about
+what decides — which model, what it remembers, who it is, how it deploys.
+That is deliberate, and it is what makes the protocol adoptable by someone
+who already has an agent.
+
+If you want the other half, [desk-buddy](https://github.com/jcarranz97/desk-buddy)
+is a product built on OBP and answers all of it.
+
+## Principles
+
+- **The body carries the schema.** A catalogue of device types in the host
+  fails the first time someone builds something nobody anticipated.
+- **Intents down, results up.** A tool call takes seconds; a motor needs
+  milliseconds. The body owns kinematics, limits and reflexes.
+- **Errors are results**, so a decider can explain itself instead of hanging.
+- **Transport is a binding** — in-process, stdio, serial, MQTT. A body on a
+  USB cable must never need a broker.
+- **Capabilities come from hardware.** The same firmware on a different board
+  advertises a different verb list.
+
+## Status
+
+**v0, unstable.** Published so implementations can find its edges. Two
+requirements — deterministic verb ordering and `userOnly` — exist because
+running code found problems the design had not.
+
+Two conforming bodies exist today, in C and MicroPython, verified on a real
+Raspberry Pi Pico: [`experiments/001-pico-usb-body`](experiments/001-pico-usb-body/).
 
 ## Documentation
 
-The docs are [MkDocs Material](https://squidfunk.github.io/mkdocs-material/).
-To read them locally:
-
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install mkdocs-material
-mkdocs serve          # http://127.0.0.1:8000
+uvx --with mkdocs-material mkdocs serve    # http://127.0.0.1:8000
 ```
 
-`mkdocs build --strict` is what CI runs on every pull request; pushes to
-`main` deploy to GitHub Pages via `.github/workflows/deploy-docs.yml`.
-
-| Document | What it covers |
+| | |
 |---|---|
-| [Home](docs/index.md) | What the pet is and how the pieces fit |
-| [Roadmap](docs/roadmap.md) | Five phases, each independently playable |
-| [Requirements](docs/requirements.md) | Numbered `FR`/`NFR` requirements the architecture cites |
-| [Open Questions](docs/open-questions.md) | Decisions to make before Phase 0 |
-| [Architecture](docs/architecture/overview.md) | Protocol, simulation, brain, voice, firmware, hardware |
-| [Original Brief](docs/brief.md) | The seed document, kept verbatim |
+| [Specification](docs/spec/overview.md) | Roles, messages, descriptors, results, presence, bindings, versioning, security |
+| [Conformance](docs/spec/conformance.md) | What an implementation must do, and how to test it |
+| [Rationale](docs/rationale.md) | Why it is shaped this way, and what was rejected |
+| [Implementations](docs/implementations.md) | Working bodies, and how to write one |
+| [Prior art](docs/prior-art.md) | Who else is doing this, with licences |
 
-## Planned layout
+## License
 
-Nothing below exists yet. It is here so the docs can refer to it.
-
-```text
-daemon/      Python + SQLite. Owns state, runs the sim tick, hosts the brain,
-             the Telegram bot and the homelab webhook.
-firmware/    ESP32-S3. Display, buttons, buzzer, I2S mic + speaker.
-docs/        These documents.
-```
+[MIT](LICENSE).
