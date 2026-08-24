@@ -1,0 +1,11 @@
+# A broker for the experiment. Nothing here is production configuration:
+# anonymous access on the LAN is fine for a Pico blinking an LED on a desk
+# and wrong for anything else.
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"     # MQTT
+      - "9001:9001"     # MQTT over WebSocket, for the cluster case
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
