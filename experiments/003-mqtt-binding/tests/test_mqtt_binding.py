@@ -78,6 +78,30 @@ check(len([n for n in names if n.startswith("fake-mqtt-1__")]) == 2, "body 1 con
 check(len([n for n in names if n.startswith("fake-mqtt-2__")]) == 2, "body 2 contributes its own")
 check(names == sorted(names), "and the combined list is still sorted")
 
+print("a reply must carry the request's id verbatim (B8a)")
+# The Pico W firmware read this id as a long, so every string id came back as
+# 0 and the reply was unmatchable -- the body answered correctly and looked
+# silent. Nothing in the suite caught it, because the fake body echoes ids for
+# free and every example in the spec used a number.
+import json  # noqa: E402
+import queue  # noqa: E402
+
+for probe_id in ("probe-string-1", 7, "01J8XRQ2F7ZK"):
+    q = conn._replies.setdefault("fake-mqtt-2", queue.Queue())
+    while not q.empty():
+        q.get_nowait()
+    conn.client.publish("obp/body/fake-mqtt-2/rpc",
+                        json.dumps({"jsonrpc": "2.0", "id": probe_id,
+                                    "method": "ping"}), qos=1)
+    try:
+        reply = q.get(timeout=5)
+    except queue.Empty:
+        check(False, f"no reply to id {probe_id!r}")
+        continue
+    check(reply.get("id") == probe_id,
+          f"id {probe_id!r} echoed as {reply.get('id')!r}, same type "
+          f"({type(reply.get('id')).__name__})")
+
 print("a Last Will clears the retained presence")
 b1.kill()                                   # no goodbye: the broker must notice
 check(wait_for(lambda: "fake-mqtt-1" not in conn.bodies(), timeout=20),

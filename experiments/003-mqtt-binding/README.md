@@ -147,24 +147,114 @@ That last pair is the presence mechanism the specification recommends,
 working exactly as described: a retained announcement, cleared by a Last Will
 with an empty payload. No heartbeat table, no TTL sweeper.
 
-### Part B — the Pico W ⏳
+### Part B — the Pico W ✅ 2026-08-24
 
-- Board: `______` · broker at `______` · SSID `______`
+- Board: `picow-7c6e37` (Pico W, pico-sdk C, no MicroPython) · broker on the
+  LAN at `:1883` · SSID and PSK passed on the cmake command line.
 
 ```text
+$ obp_cli --mqtt bodies
+picow-7c6e37         Raspberry Pi Pico W body           2 verbs  via mqtt  caps: led
 
+$ obp_cli --mqtt describe
+Raspberry Pi Pico W body  [picow-7c6e37]  fw obp-picow-0.1.0
+caps: led
+  set_led(on:boolean)         Turn the body's indicator light on or off.
+  blink(times, interval_ms)   Blink the indicator light.
+  reboot()  !user-only        Restart the body. Disconnects it briefly.
+
+$ obp_cli --mqtt call blink times=4 interval_ms=150
+blinked 4 times
+$ obp_cli --mqtt call blink times=99
+ERROR: times must be between 1 and 10
 ```
+
+Five consecutive `blink` calls: 0.9–1.1 s each, process start to printed
+result — connect, discover, describe and call, over WiFi.
 
 | Check | Result |
 |---|---|
-| Serial log shows wifi ok and `mqtt connected` | ⬜ |
-| Three flashes on connect | ⬜ |
-| `obp_cli --mqtt bodies` lists `picow-xxxxxx` | ⬜ |
-| `describe` shows **no** `set_brightness`, `caps: led` only | ⬜ |
-| `blink times=5` blinks five times | ⬜ |
-| `blink times=99` returns a readable error | ⬜ |
-| Powering the Pico off withdraws its verbs within the keep-alive | ⬜ |
-| Powering it back on brings them back with no host restart | ⬜ |
+| Serial log shows wifi ok and `mqtt connected` | ✅ |
+| `obp_cli --mqtt bodies` lists `picow-7c6e37` | ✅ |
+| `describe` shows **no** `set_brightness`, `caps: led` only | ✅ |
+| `blink times=5` blinks | ✅ |
+| `blink times=99` returns a readable error, not a fault | ✅ |
+| `userOnly` reboot hidden from agents, callable by a person | ✅ |
+| Ids echoed verbatim: string, number and null (B8a) | ✅ |
+| A reboot withdraws presence and returns without a host restart | ✅ |
+
+### A body that knows it is leaving should say so
+
+Instrumenting presence transitions through a reboot made the difference
+measurable:
+
+```text
+  1.30s  reply: 'rebooting'  isError=False
+  1.30s  presence: picow-7c6e37 -> ABSENT     <- the body clearing its own
+ 14.27s  presence: picow-7c6e37 -> ABSENT     <- the broker's Last Will, finally
+ 14.64s  presence: picow-7c6e37 -> PRESENT
+ 47.24s  after its return: blinked 3 times
+```
+
+Both mechanisms fire, thirteen seconds apart. The Last Will is the backstop for
+a body that dies without warning; it cannot be fast, because the broker has to
+wait out a keep-alive to know. A body that is going deliberately already knows,
+and publishing the empty retained payload itself is the difference between a
+host seeing a restart and a host confidently calling a board that is not there.
+
+Worth noting how this was nearly missed: an earlier version of this check polled
+`bodies()` once a second and reported "presence never withdrawn". The body was
+correct and the test could not see it. Presence is an event, so the test had to
+watch for the event rather than sample for it.
+
+### What Part B actually cost: two bugs and a spec gap
+
+Neither bug was in a message. Both were in the space around it.
+
+**1. A 2 KB buffer starved a 4 KB heap.** The board opened TCP to the broker
+and then said nothing; mosquitto logged `exceeded timeout` over and over. The
+vendor's own `picow_mqtt_client` connected first try, which proved the board,
+the WiFi, the broker and the toolchain were all fine. A full diff of
+`lwipopts.h` against the vendor's showed **only debug flags differed** — and I
+dismissed that as cosmetic. It was the answer. Turning `LWIP_DEBUG` and
+`MQTT_DEBUG` on produced the diagnosis in a single line:
+
+```text
+mqtt_output_send: tcp_sndbuf: 11680 bytes, ringbuf_linear_available: 60, get 0, put 60
+mqtt_output_send: Send failed with err -1 ("Out of memory error.")
+```
+
+A 60-byte CONNECT, an 11 KB send window, and no memory to build a pbuf. The
+cause was mine: I had raised `MQTT_OUTPUT_RINGBUF_SIZE` to 2048 so a 1.4 KB
+describe response would fit, and that buffer lives *inside* the `mqtt_client_t`
+allocated from `MEM_SIZE 4000`. I made the buffer big enough for the data and
+starved the allocator the same data had to pass through. `MEM_SIZE` is now
+16000; a Pico W has 264 KB of RAM, so the frugality bought nothing.
+
+**2. The id was read as a `long`.** JSON-RPC ids may be strings or numbers, and
+`handle_request` parsed with `jm_get_int`, so every string id came back as `0`.
+A host correlates replies by id and silently skips the ones that do not match,
+so the body answered correctly, in 0.8 s, to a host that could never claim the
+answer. **It failed as silence.**
+
+The spec is what taught me this. `conformance.md` had **no requirement to echo
+the id at all**, and every example in `messages.md` used a number. An
+implementer reading them would do exactly what I did. Both are fixed: **B8a**
+is now normative, an example uses a string id, and the suite probes string,
+numeric and null ids against the fake body and the real board.
+
+**3. `reboot` never replied.** It cleared its presence and reset from inside
+the lwIP callback, so both the presence-clear and the reply were still in the
+output ring buffer when the core went down. The verb worked perfectly and
+reported as a timeout. It now answers, clears presence, and lets the main loop
+reset once lwIP has flushed — B8 applies to `reboot` like anything else.
+
+**An honest note on what is *not* established.** Before the id fix, the CLI —
+which sends *numeric* ids — also timed out, and the id bug does not explain
+that: compiling `json_min.c` on the host and feeding it the exact 54-byte
+request shows numeric ids parse correctly. Something else was wrong in that
+window and was cleared by the reflash. The binding has been reliable across
+every run since, so this is recorded rather than chased.
 
 ### Part C — two bindings at once ⏳
 

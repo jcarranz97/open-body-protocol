@@ -3,6 +3,13 @@
 Five messages. Every one is a JSON-RPC 2.0 object; requests carry an `id`,
 notifications do not.
 
+An `id` **MAY** be a string or a number, and a reply **MUST** echo the
+request's verbatim, preserving its type ([B8a](conformance.md)). It is the only
+thing tying an answer to the question that asked it, and a host skips replies it
+cannot match — so a body that rewrites, renumbers or coerces the `id` does not
+fail loudly. It appears to say nothing at all while answering perfectly. Do not
+parse it as an integer; treat it as an opaque token to be handed back.
+
 | Message | Direction | Kind |
 |---|---|---|
 | `notifications/body/online` | body → host | notification |
@@ -64,7 +71,7 @@ while an action is running.
 ## `tools/call`
 
 ```json
-{"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+{"jsonrpc": "2.0", "id": "01J8XRQ2F7", "method": "tools/call",
  "params": {"name": "set_brightness", "arguments": {"level": 40}}}
 ```
 

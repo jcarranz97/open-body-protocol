@@ -33,6 +33,7 @@ requirement here is one somebody would otherwise get wrong.
 | | Requirement |
 |---|---|
 | B8 | **MUST** reply to every `tools/call`. |
+| B8a | **MUST** echo the request's `id` verbatim, whether it is a string or a number. A reply carrying any other `id` is unmatchable, and is worse than no reply: the body looks silent while it is in fact answering. |
 | B9 | **MUST** validate arguments against its own schema and physical limits, and **MUST NOT** trust the host. |
 | B10 | **MUST** return `isError: true` with readable text for a rejected or impossible call. |
 | B11 | **MUST NOT** crash, hang or close the connection on malformed input. |
