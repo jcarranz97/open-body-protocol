@@ -256,34 +256,80 @@ request shows numeric ids parse correctly. Something else was wrong in that
 window and was cleared by the reflash. The binding has been reliable across
 every run since, so this is recorded rather than chased.
 
-### Part C — two bindings at once ⏳ (partly run 2026-08-24)
+### Part C — two bindings at once ✅ 2026-08-24
 
-The plain Pico on USB **and** the Pico W over MQTT, in one registry, both
-offered to one agent. This is the claim that transport is a binding, stated
-as plainly as it can be. Pending: the plain Pico needs to be attached.
-
-What has already run is the half nobody plans for. The Pico W exposes a USB
-serial console for its own debug log, and it is **not** an OBP body — so
-`--port auto` finds a device that opens cleanly, emits text, and cannot answer:
+The plain Pico on USB **and** the Pico W over MQTT, in one registry, offered to
+one agent. The Pico W was plugged into a 5 V charger, not this computer: its
+only route here is WiFi.
 
 ```text
 $ obp_cli --mqtt --port auto bodies
-[body stderr] up: body=picow-7c6e37 wifi=192.168.1.227 mqtt=connected
-/dev/serial/by-id/usb-Raspberry_Pi_Pico_E6614864D37C6E37-if00: no response to body/describe within 5.0s
 picow-7c6e37         Raspberry Pi Pico W body           2 verbs  via mqtt  caps: led
+pico-3f5022          Raspberry Pi Pico body (pico-sdk)  4 verbs  via usb   caps: led, dimmable
+
+what one agent is offered, from both bindings at once:
+  pico-3f5022__blink            [Raspberry Pi Pico body (pico-sdk)] Blink the indicator light
+  pico-3f5022__move             [Raspberry Pi Pico body (pico-sdk)] Move the body in a direction
+  pico-3f5022__set_brightness   [Raspberry Pi Pico body (pico-sdk)] Set how brightly the light...
+  pico-3f5022__set_led          [Raspberry Pi Pico body (pico-sdk)] Turn the body's light on/off
+  picow-7c6e37__blink           [Raspberry Pi Pico W body] Blink the indicator light
+  picow-7c6e37__set_led         [Raspberry Pi Pico W body] Turn the body's indicator light...
+
+driving each body through the same registry:
+  picow-7c6e37__blink           blinked 3 times          <- over WiFi, from a charger
+  pico-3f5022__blink            blinked 3 times          <- over USB
+  pico-3f5022__set_brightness   brightness 25%
+  pico-3f5022__set_brightness   brightness 100%
+  pico-3f5022__set_led          light off
+
+the capability difference is enforced, not advertised away:
+  picow set_brightness -> no body currently offers 'picow-7c6e37__set_brightness'  isError=True
 ```
 
-One board, two ways in, and only the one that answers is a body — which is
-[H5a](../../docs/spec/conformance.md) meeting a real impostor rather than a
-contrived one. An attached device is a device; a body is something that
-replies.
+Two boards, two transports, one namespaced and deterministically sorted list.
+Nothing in the host distinguishes them past the transport, which is the claim
+this experiment exists to make. The Pico W cannot dim — its LED hangs off the
+wireless chip — so `set_brightness` is absent from its descriptor rather than
+present and failing, and the registry refuses the call because no body offers
+it.
 
-Getting there needed a fix. `--port auto` is this experiment's headline flag
-and it silently found nothing: `ports.expand()` turns `auto` into the attached
-devices, experiment 002 calls it, and this CLI never did — it passed the
-literal string `auto` to `resolve()`, which matched no path. The failure
-printed *"auto: not present"* directly above a list of attached devices, which
-is the kind of self-contradicting message that gets read past.
+### The one that should worry us: a body that reports motion it did not perform
+
+Running everything together surfaced a **B4 violation in our own reference
+firmware**, which had survived experiments 001 and 002 unnoticed:
+
+```text
+verbs advertised: ['set_led', 'blink', 'set_brightness', 'move', 'reboot']
+caps advertised : ['led', 'dimmable']          <- no drivetrain
+
+move(direction=forward) -> "acknowledged move forward 10cm
+                            (simulated: no drivetrain attached)"
+isError                 -> False
+```
+
+`move` is advertised by a board with no drivetrain, and reports **success**.
+The honesty is real but it is in prose, and prose is not where an agent looks:
+anything checking `isError` concludes the robot moved. Compare
+`set_brightness`, which the Pico W simply does not advertise — that is the
+behaviour B4 asks for, and the contrast between the two verbs on one run is
+what made this visible.
+
+This is the worst failure mode an embodied agent has. A body that refuses is
+recoverable; a body that lies about acting corrupts everything the agent
+believes about the world, and no amount of care in the brain can detect it. It
+is exactly the class of bug this protocol exists to make impossible, and our
+own firmware shipped it through two experiments.
+
+Two ways out, and the spec should say which:
+
+1. **Do not advertise it.** A drivetrain-less board offers no `move`, the way
+   the Pico W offers no `set_brightness`. Honest, and already required by B4.
+2. **Advertise it and refuse it** — `isError: true`, "no drivetrain attached".
+   Useful when hardware is hot-pluggable and the verb may become real later.
+
+What is not acceptable is the third thing it currently does: succeed. A
+simulated action **MUST NOT** report success, and that belongs in the
+conformance list rather than in this README.
 
 ---
 
