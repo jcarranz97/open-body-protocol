@@ -44,7 +44,7 @@ directly on this design:
 | `tools/list` carries `ttlMs` / `cacheScope` | List once at boot, cache, refresh on TTL |
 
 That third row is the load-bearing one. It means the split on the
-[brain](brain-contract.md) page is not merely preferable but structural: **generation
+[brain](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/brain.md) page is not merely preferable but structural: **generation
 lives in the daemon, permanently.**
 
 ## Outbound — the daemon as an MCP client
@@ -79,7 +79,7 @@ Three ways to do it, in increasing weight:
 |---|---|---|
 | **Official `mcp` Python SDK** | `mcp` v2.x ships a high-level `Client`; transport inferred from the target, including **in-process** | The default. The daemon owns the loop |
 | **`anthropic[mcp]` + `tool_runner`** | A local stdio MCP client whose tools are handed to the Messages API loop, which yields each turn before tools run | When you want a real agent loop but no subprocess and no tunnel |
-| **A harness** ([brain](brain-contract.md)) | Delegate the whole loop | Sense tier only |
+| **A harness** ([brain](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/brain.md)) | Delegate the whole loop | Sense tier only |
 
 !!! warning "Pin the SDK deliberately"
     `mcp` 2.0 is a breaking release: `FastMCP` became `MCPServer` and
@@ -137,7 +137,7 @@ no benefit.
 
 **Every inbound call is an ordinary event.** `feed()` from an agent and a
 thumb on a button produce the same row in the same table, with the same
-ULID discipline ([bindings](bindings.md)). There is no agent-specific path
+ULID discipline ([bindings](../spec/bindings.md)). There is no agent-specific path
 through the core, and there must never be one.
 
 ### The mechanic this unlocks
@@ -158,7 +158,7 @@ body you can pick up.
 On a single machine there is nothing to design: the MCP server is a port on
 the same container as the daemon, the client dials stdio subprocesses or
 `http://localhost`, and neither crosses a network boundary
-([deployment](deployment.md)).
+([deployment](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/deployment.md)).
 
 The rest of this section is about the case where the pet shares a
 **cluster** with the agents it talks to — a homelab, not a requirement.
@@ -201,7 +201,7 @@ anyway (FR-153).
 The second arrow answers a problem clusters pose and single machines do not:
 an HTTP-only ingress cannot route plain MQTT. **MQTT over WebSocket is
 HTTP-shaped**, so it goes through the existing ingress like any web app —
-the same trick [roaming](roaming.md) recommends for v2, arriving early for
+the same trick [roaming](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/roaming.md) recommends for v2, arriving early for
 anyone who deploys this way. On `docker compose` the broker is just a
 service on the same network and none of this applies.
 
@@ -221,8 +221,8 @@ The pet's tool surface is small, and it should stay small.
 ## What this is not
 
 - Not a way for an agent to *be* the pet's brain — that is the sense tier on
-  the [brain](brain-contract.md) page, and it is a client concern, not a server one.
-- Not a transport for bodies. Bodies speak MQTT ([bindings](bindings.md));
+  the [brain](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/brain.md) page, and it is a client concern, not a server one.
+- Not a transport for bodies. Bodies speak MQTT ([bindings](../spec/bindings.md));
   MCP is for tools.
 - Not a substitute for the webhook. `POST /event` stays, because a restic
   hook should not need an MCP client to say one thing.

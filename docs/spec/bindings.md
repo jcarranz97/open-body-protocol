@@ -1,11 +1,11 @@
 # Bindings
 
-The [body contract](body-contract.md) says *what* is exchanged. A binding
+The [body contract](messages.md) says *what* is exchanged. A binding
 says *how it travels*. There are three, they are interchangeable, and the
 core cannot tell which is in use.
 
 That interchangeability is not a nicety — it is what makes the
-[topologies](deployment.md) work, from a model sitting beside the servos on
+[topologies](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/deployment.md) work, from a model sitting beside the servos on
 one board to a body across a Wi-Fi network.
 
 ```mermaid
@@ -94,7 +94,7 @@ Borrowed from EMQX's MCP-over-MQTT binding, which is otherwise dormant and
 
 **On a cluster with an HTTP-only ingress**, MQTT over WebSocket is
 HTTP-shaped and routes like any web app — the same trick
-[roaming](roaming.md) recommends for v2, arriving early for anyone deploying
+[roaming](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/roaming.md) recommends for v2, arriving early for anyone deploying
 that way.
 
 ### Access control
@@ -123,7 +123,7 @@ its own.
 | Body is code in the daemon | in-process |
 | Body is on this machine's USB, GPIO or serial | stdio / serial |
 | Body owns its own board and network | MQTT |
-| Body is a ROS 2 robot | MQTT, bridged with `mqtt_client` — config, no code ([deployment](deployment.md)) |
+| Body is a ROS 2 robot | MQTT, bridged with `mqtt_client` — config, no code ([deployment](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/deployment.md)) |
 | Body is a phone or a browser | MQTT over WebSocket |
 
 **A deployment may use several at once**, and routinely will: a terminal

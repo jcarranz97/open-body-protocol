@@ -1,86 +1,78 @@
 # Open Body Protocol (OBP)
 
-**Open Body Protocol (OBP) connects a brain to a body.**
+**A standard way to give an agent a body.**
 
-The brain is an AI agent — Claude, a local Qwen or Gemma, OpenClaw, Hermes,
-OpenCode. The body is whatever hardware someone built: a terminal window, a
-screen and a speaker, a 3D-printed crab with servos, a commercial robot that
-adopts the contract.
+A body — a microcontroller, a robot, a terminal window — announces itself,
+**describes its own verbs with JSON Schema**, and executes them. A host
+discovers those verbs at run time and offers them to whatever is deciding.
+Nothing in the host is taught what a claw is.
 
-Neither is ours. The standardised way to marry them is.
+```jsonc
+// host → body
+{"jsonrpc":"2.0","id":1,"method":"body/describe"}
 
-```text
-  any brain              obp                any body
- ───────────      ───────────────      ─────────────────
-  Claude       ◄─►  identity        ◄─►  terminal
-  local model       memory               ESP32 / Pico
-  OpenClaw          translation          servos, wheels, claws
-  Hermes            presence             a commercial robot
+// body → host: identity, capabilities and verbs, in one round trip
+{"jsonrpc":"2.0","id":1,"result":{"v":0,
+  "body":{"id":"pico-3f5022","fw":"0.1.0","caps":["led","dimmable"]},
+  "tools":[{"name":"set_brightness",
+            "description":"Set how brightly the indicator light glows.",
+            "inputSchema":{"type":"object",
+              "properties":{"level":{"type":"integer","minimum":0,"maximum":100}},
+              "required":["level"]}}]}}
+
+// host → body
+{"jsonrpc":"2.0","id":2,"method":"tools/call",
+ "params":{"name":"set_brightness","arguments":{"level":40}}}
+
+// body → host
+{"jsonrpc":"2.0","id":2,"result":{
+  "content":[{"type":"text","text":"brightness 40%"}],"isError":false}}
 ```
 
-A body **describes its own abilities** — *"I can `move(direction,
-distance_cm)` and `set_brightness(level: 0–100)"*, with JSON Schema — and the
-daemon turns that into verbs the brain can call. Nobody teaches the daemon
-what wheels are.
+## Scope
 
-> **Status: architecture, with the first claim tested.** There is no
-> `daemon/` yet. There *is* a working
-> [experiment](experiments/001-pico-usb-body/): a Raspberry Pi Pico
-> describing itself to a host that had never met it, over a bare USB cable,
-> in two firmware languages.
+OBP specifies how a body is **described and driven**. It says nothing about
+what decides — which model, what it remembers, who it is, how it deploys.
+That is deliberate, and it is what makes the protocol adoptable by someone
+who already has an agent.
 
-## The idea in one table
+If you want the other half, [desk-buddy](https://github.com/jcarranz97/desk-buddy)
+is a product built on OBP and answers all of it.
 
-| | Plugs in | Must do |
-|---|---|---|
-| [Body port](docs/architecture/body-contract.md) | anything physical or rendered | announce itself, describe its verbs, accept intents, report honestly |
-| [Brain port](docs/architecture/brain-contract.md) | any model or agent harness | take context, return a decision |
-| The daemon | — | hold identity and memory, translate, stay out of the way |
+## Principles
 
-## Topology is a binding, not an architecture
+- **The body carries the schema.** A catalogue of device types in the host
+  fails the first time someone builds something nobody anticipated.
+- **Intents down, results up.** A tool call takes seconds; a motor needs
+  milliseconds. The body owns kinematics, limits and reflexes.
+- **Errors are results**, so a decider can explain itself instead of hanging.
+- **Transport is a binding** — in-process, stdio, serial, MQTT. A body on a
+  USB cable must never need a broker.
+- **Capabilities come from hardware.** The same firmware on a different board
+  advertises a different verb list.
 
-| Where things run | Binding |
-|---|---|
-| All in one box — Jetson, mini PC, Pi, actuators on USB | stdio subprocess, no broker |
-| One box, split processes | unix socket / localhost |
-| Brain on a PC, body over Wi-Fi | MQTT |
-| No hardware at all | in-process |
+## Status
 
-A robot with the model inside its own chassis and the network unplugged is a
-config file, not a fork.
+**v0, unstable.** Published so implementations can find its edges. Two
+requirements — deterministic verb ordering and `userOnly` — exist because
+running code found problems the design had not.
+
+Two conforming bodies exist today, in C and MicroPython, verified on a real
+Raspberry Pi Pico: [`experiments/001-pico-usb-body`](experiments/001-pico-usb-body/).
 
 ## Documentation
-
-[MkDocs Material](https://squidfunk.github.io/mkdocs-material/), run through
-[uv](https://docs.astral.sh/uv/) — no virtualenv to create or remember:
 
 ```bash
 uvx --with mkdocs-material mkdocs serve    # http://127.0.0.1:8000
 ```
 
-| Document | What it covers |
+| | |
 |---|---|
-| [Overview](docs/architecture/overview.md) | The shape, in one page |
-| [Body contract](docs/architecture/body-contract.md) | The specification — read this to build a body |
-| [Brain contract](docs/architecture/brain-contract.md) | Plugging in a model or a harness |
-| [Identity & memory](docs/architecture/identity.md) | Who owns the character, and when |
-| [Behaviour packs](docs/architecture/behaviour-packs.md) | Optional behaviour, including a Tamagotchi |
-| [Deployment](docs/architecture/deployment.md) | One container, on whatever machine you have |
-| [Experiments](experiments/) | What has been tried, and what it changed |
+| [Specification](docs/spec/overview.md) | Roles, messages, descriptors, results, presence, bindings, versioning, security |
+| [Conformance](docs/spec/conformance.md) | What an implementation must do, and how to test it |
+| [Rationale](docs/rationale.md) | Why it is shaped this way, and what was rejected |
+| [Implementations](docs/implementations.md) | Working bodies, and how to write one |
 | [Prior art](docs/prior-art.md) | Who else is doing this, with licences |
-
-## Planned layout
-
-Nothing below exists yet.
-
-```text
-daemon/      Python + SQLite. Registry, presence, translation, packs.
-client/      The body half — transports, descriptors, presence.
-bodies/      Reference bodies: terminal, ESP32, Pico.
-packs/       Behaviour packs, including the Tamagotchi one.
-experiments/ Runnable answers to single questions.
-docs/        These documents.
-```
 
 ## License
 

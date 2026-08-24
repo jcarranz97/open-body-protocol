@@ -1,52 +1,50 @@
 # Open Body Protocol (OBP)
 
-**Open Body Protocol (OBP) connects a brain to a body.** The brain is any
-AI agent — a model API, a local model, or a harness like OpenClaw, Hermes or
-OpenCode. The body is any hardware someone built, from a terminal window to a
-printed robot. The project is the standardised layer between them, and ships
-neither.
+**A specification**: how a body describes itself and is driven. This
+repository is the protocol, its rationale, its conformance rules, and
+reference bodies that prove it.
 
-**Status: architecture.** There is no `daemon/`, `client/`, `bodies/` or
-`packs/` yet. There is a validated experiment under `experiments/`.
+**It is not a product.** What decides — which model, what it remembers, who
+it is, how it deploys — is out of scope. That lives in
+[desk-buddy](https://github.com/jcarranz97/desk-buddy).
 
-## The invariants
+## The test for anything added here
 
-Load-bearing decisions. When a change would violate one, say so rather than
-working around it.
+*Does this constrain someone implementing a body?*
 
-1. **Two ports, one translator.** Everything is the body port, the brain
-   port, or the small daemon between them. Code that belongs to neither
-   probably belongs in a behaviour pack.
-2. **The body describes itself.** Verbs with JSON Schema, discovered at run
-   time. Never a catalogue of known device types in the daemon.
-3. **Transport is a binding, not the architecture.** MQTT is one adapter. A
-   USB body must never require a broker; an all-in-one box must never
-   require a network.
-4. **Intents down, results up.** The brain names what it wants; the body
-   owns kinematics, timing, safety and reflexes. Never raw actuator
-   commands.
-5. **Errors are results.** A rejected or impossible call returns a readable
-   `isError` result so a brain can explain itself. Never a hang, never a
-   crash.
-6. **Sort tools deterministically, key identity on hardware.** Both were
-   learned from experiment 001; both are in `docs/architecture/body-contract.md`
-   with the reasoning.
-7. **A harness owns identity when present; otherwise the daemon does.** Never
-   both. See `docs/architecture/identity.md`.
-8. **Anything opinionated is a pack.** The core connects things; it does not
-   decide what the thing wants. A Tamagotchi is a pack.
-9. **One container, one volume, no orchestrator.** If a step requires
-   Kubernetes, a reverse proxy, a public hostname or an inbound port, it is
-   wrong. The floor is a Pi running `docker compose up`.
-10. **The microphone opens only while push-to-talk is held.** A firmware
-    invariant, not a policy.
+If yes, it belongs here. If it is about which model thinks, who owns a
+persona, how something deploys, or what a robot should be like, it belongs in
+desk-buddy. That split is why the two repositories exist, and it erodes
+easily.
 
-## Experiments come before specifications
+## Invariants
+
+1. **The body carries the schema.** Never a catalogue of device types in the
+   host.
+2. **Intents down, results up.** The body owns kinematics, timing, limits and
+   reflexes.
+3. **Errors are results**, never transport failures or crashes.
+4. **Transport is a binding.** A USB body must never require a broker.
+5. **Presence is abstract**, with a per-binding implementation. MQTT's
+   retained-message form is the nicest and does not generalise.
+6. **The host sorts verbs and namespaces them.** Bodies cannot be trusted to
+   order their own.
+7. **`userOnly` is a guardrail, not access control.**
+8. **v0 is unstable**, and changes are recorded with the reason.
+
+## Normative language
+
+Requirements use RFC 2119 keywords. **Every normative requirement must appear
+in `docs/spec/conformance.md`**, which is the authoritative list; prose
+elsewhere explains and illustrates, and must not introduce a requirement that
+is not in that table.
+
+## Experiments come before specification
 
 `experiments/` holds runnable answers to single questions, indexed with what
-each one changed. Several rules in the architecture exist because an
-experiment produced them — cite the experiment when writing such a rule, and
-add a new experiment rather than asserting a claim that could be tested.
+each one changed. Several requirements exist because an experiment produced
+them — cite the experiment when writing such a rule, and add an experiment
+rather than asserting a claim that could be tested.
 
 ## Documentation
 

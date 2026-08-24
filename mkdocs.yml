@@ -32,26 +32,21 @@ theme:
 
 nav:
   - Home: index.md
-  - Roadmap: roadmap.md
-  - Requirements: requirements.md
-  - Open Questions: open-questions.md
+  - Specification:
+    - Overview: spec/overview.md
+    - Messages: spec/messages.md
+    - Descriptors: spec/descriptors.md
+    - Results & errors: spec/results.md
+    - Presence: spec/presence.md
+    - Bindings: spec/bindings.md
+    - Versioning: spec/versioning.md
+    - Security: spec/security.md
+    - Conformance: spec/conformance.md
+  - Rationale: rationale.md
+  - Implementations: implementations.md
+  - Guides:
+    - Using OBP with MCP: guides/using-obp-with-mcp.md
   - Prior Art: prior-art.md
-  - Architecture:
-    - Overview: architecture/overview.md
-    - Body contract: architecture/body-contract.md
-    - Brain contract: architecture/brain-contract.md
-    - Identity & memory: architecture/identity.md
-    - Behaviour packs: architecture/behaviour-packs.md
-    - Deployment: architecture/deployment.md
-    - Bindings: architecture/bindings.md
-    - MCP & tools: architecture/mcp.md
-    - Voice: architecture/voice.md
-    - Firmware: architecture/firmware.md
-    - Terminal body (TUI): architecture/tui.md
-    - Integrations: architecture/integrations.md
-    - Hardware: architecture/hardware.md
-    - Roaming (v2): architecture/roaming.md
-  - Original Brief: brief.md
 
 markdown_extensions:
   - admonition

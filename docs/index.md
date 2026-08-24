@@ -1,121 +1,99 @@
 # Open Body Protocol (OBP)
 
-**Open Body Protocol (OBP) connects a brain to a body.**
+**A standard way to give an agent a body.**
 
-The brain is an AI agent — Claude, a local Qwen or Gemma, OpenClaw, Hermes,
-OpenCode, anything that can hold a conversation and call a tool. The body is
-whatever hardware someone built: a terminal window, a screen and a speaker,
-a 3D-printed crab with servos, a commercial robot that adopts the contract.
-
-Neither is ours. **The standardised way to marry them is.**
+A body — a microcontroller, a robot, a terminal window — announces itself,
+**describes its own verbs with schemas**, and executes them. A host discovers
+those verbs at run time and offers them to whatever is deciding. Nothing in
+the host is taught what a claw is.
 
 ```mermaid
 flowchart LR
-    subgraph Brains["Brains — bring your own"]
-        B1["Claude / any API"]
-        B2["Local model<br/>Qwen · Gemma"]
-        B3["A harness<br/>OpenClaw · Hermes · OpenCode"]
-    end
+    D["whatever decides<br/>a model · a harness · a script · a person"]
+    H["host"]
+    B1["a Pico on USB"]
+    B2["a robot on Wi-Fi"]
+    B3["a terminal"]
 
-    D["obp<br/>identity · memory · translation"]
+    D <-->|"out of scope"| H
+    H <-->|"OBP"| B1
+    H <-->|"OBP"| B2
+    H <-->|"OBP"| B3
 
-    subgraph Bodies["Bodies — bring your own"]
-        Y1["terminal"]
-        Y2["ESP32 · Pico<br/>screen · speaker"]
-        Y3["something with servos"]
-    end
-
-    B1 --- D
-    B2 --- D
-    B3 --- D
-    D --- Y1
-    D --- Y2
-    D --- Y3
-
-    classDef core fill:#4f46e5,stroke:#3730a3,color:#fff
-    class D core
+    classDef spec fill:#4f46e5,stroke:#3730a3,color:#fff
+    class H,B1,B2,B3 spec
 ```
 
-!!! info "Status — architecture, with the first claim tested"
-    There is no `daemon/` yet. There *is* a working
-    [experiment](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/001-pico-usb-body):
-    a Raspberry Pi Pico describing its own abilities to a host that had never
-    met it, over a bare USB cable, in two firmware languages. The pages here
-    cite it rather than speculate.
+## Scope
 
-## The two ports
+OBP specifies **how a body is described and driven**. It does not specify
+what decides. How a model thinks, what it remembers, who it is, how it is
+deployed — all deliberately out of scope, and answered by
+[desk-buddy](https://github.com/jcarranz97/desk-buddy) or by whatever you
+already use.
 
-Everything in this project is one of three things: the **body port**, the
-**brain port**, or the small amount of daemon that sits between them.
+If you have an agent and want to give it a body, this is the part you need.
 
-| | What plugs in | What it must do |
-|---|---|---|
-| **[Body port](architecture/body-contract.md)** | Anything physical or rendered | Announce itself, describe its own abilities with schemas, accept intents, report honestly |
-| **[Brain port](architecture/brain-contract.md)** | Any model or agent harness | Take context, return a decision |
-| **The daemon** | — | Hold identity and memory, translate between the two, and stay out of the way |
+## In one screen
 
-A body advertises **tools**, not capabilities-by-name. It says *"I can
-`move(direction, distance_cm)` and `set_brightness(level: 0–100)"*, with JSON
-Schema, and the daemon turns that into something the brain can call. Nobody
-teaches the daemon what wheels are.
+```jsonc
+// host → body
+{"jsonrpc":"2.0","id":1,"method":"body/describe"}
 
-## Why this and not the alternatives
+// body → host
+{"jsonrpc":"2.0","id":1,"result":{
+  "v": 0,
+  "body": {"id":"pico-3f5022","name":"Pico body","fw":"0.1.0","caps":["led","dimmable"]},
+  "tools": [{
+    "name": "set_brightness",
+    "description": "Set how brightly the indicator light glows, as a percentage.",
+    "inputSchema": {"type":"object",
+      "properties":{"level":{"type":"integer","minimum":0,"maximum":100}},
+      "required":["level"]}}]}}
 
-The honest version, because the research is uncomfortable and it is better
-stated than discovered later:
+// host → body
+{"jsonrpc":"2.0","id":2,"method":"tools/call",
+ "params":{"name":"set_brightness","arguments":{"level":40}}}
 
-- **Agents with a persona, memory and tool use are a commodity.** OpenClaw
-  has 387k stars and a `soul.md`; nanobot, airi and OVOS all ship the same
-  bundle. Building another is not interesting.
-- **Device-as-MCP-server over MQTT already exists too.** `xiaozhi-esp32` has
-  29k stars, MIT, and a servo robot dog in its documentation. This project is
-  the fourth convergent implementation of that idea, which is a *distribution
-  advantage*, not an insight.
-- **What nobody has is the layer that is indifferent to both ends.** Reachy
-  Mini's abstraction covers a simulated Reachy Mini, not a body. Harnesses
-  abstract brains and have no body concept. xiaozhi is one firmware family
-  talking to its own backend. None of them survives "the model is on a Jetson
-  beside the servos" *and* "the model is in a datacentre and the body is on
-  Wi-Fi".
+// body → host
+{"jsonrpc":"2.0","id":2,"result":{
+  "content":[{"type":"text","text":"brightness 40%"}],"isError":false}}
+```
 
-See [prior art](prior-art.md) for who is doing what, with licences.
+That is most of the protocol. The rest is presence, errors, long actions and
+the rules that stop the obvious mistakes.
 
-## Topology is a binding, not an architecture
+## Principles
 
-The same contract has to work at every scale, or the idea is hollow:
+- **The body carries the schema.** A catalogue of known device types in the
+  host fails the first time somebody builds something nobody anticipated,
+  which is the premise.
+- **Intents down, results up.** The host names what it wants; the body owns
+  kinematics, timing, limits and reflexes. A tool call takes seconds; a motor
+  needs milliseconds.
+- **Errors are results.** A rejected call comes back as readable text, so a
+  decider can explain itself rather than hang.
+- **Transport is a binding.** In-process, stdio, serial, MQTT. A body on a
+  USB cable must never need a broker.
+- **Capabilities come from hardware.** The same firmware on a different board
+  advertises a different verb list, and the host learns it by asking.
 
-| Where things run | Brain | Body | Binding |
-|---|---|---|---|
-| **All in one box** — Jetson, Ryzen AI mini PC, Pi | local model | actuators on USB | stdio subprocess, no broker |
-| **One box, split processes** | local model | local hardware daemon | unix socket / localhost |
-| **Split** | a PC or the cloud | ESP32 over Wi-Fi | MQTT |
-| **Nothing physical** | anywhere | a terminal | in-process |
+## Read in this order
 
-A robot with the model inside its own chassis and the network unplugged is a
-config file, not a fork ([deployment](architecture/deployment.md)).
+1. [Specification overview](spec/overview.md) — roles, scope, lifecycle.
+2. [Messages](spec/messages.md) and [descriptors](spec/descriptors.md) — the
+   wire format.
+3. [Conformance](spec/conformance.md) — what an implementation must do.
+4. [Rationale](rationale.md) — why it is shaped this way, and what was
+   rejected.
+5. [Implementations](implementations.md) — working bodies, and how to write
+   one.
 
-## What the daemon actually owns
+## Status
 
-Very little, deliberately — but the part it owns is the part that makes the
-thing feel continuous:
+**v0, unstable.** Published so implementations can find its edges. Two of its
+requirements — deterministic verb ordering and `userOnly` — exist because
+running code found problems the design had not.
 
-- **Identity and memory**, when the brain is a raw model. When the brain is a
-  harness that already has a `soul.md` and a memory store, the harness owns
-  them and the daemon steps back. Both modes are supported and the difference
-  is explicit ([identity](architecture/identity.md)).
-- **Translation.** Body tools become brain tools; brain decisions become body
-  intents.
-- **Presence.** Which bodies exist right now, and therefore which tools do.
-- **Behaviour packs**, which are optional and where anything resembling a
-  personality or a pet lives ([behaviour packs](architecture/behaviour-packs.md)).
-
-## Where to start
-
-1. [Overview](architecture/overview.md) — the shape, in one page.
-2. [Body contract](architecture/body-contract.md) — the specification, and
-   the thing to implement if you are building a body.
-3. [Brain contract](architecture/brain-contract.md) — plugging in a model or
-   a harness.
-4. [Deployment](architecture/deployment.md) — where it runs.
-5. [Experiments](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments)
-   — what has actually been tried, and what it changed.
+There are two conforming bodies today, one in C and one in MicroPython,
+[verified on real hardware](implementations.md#reference-bodies).

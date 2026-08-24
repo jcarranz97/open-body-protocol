@@ -7,7 +7,7 @@ Nothing found does exactly *ESP32 pet + self-hosted brain + Telegram +
 homelab events*, but every individual piece exists and is worth reading
 before writing code. The gap is narrow enough to be worth being honest about:
 what makes this project its own is the [external
-events](architecture/integrations.md#external-events), not the Tamagotchi.
+events](https://github.com/jcarranz97/desk-buddy/blob/main/docs/https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/integrations.md), not the Tamagotchi.
 
 ## Closest in spirit
 
@@ -30,7 +30,7 @@ events](architecture/integrations.md#external-events), not the Tamagotchi.
   transports, Opus streaming, and MCP built in so the backend can discover
   and call tools on the device. Its companion server is Docker-deployable
   with swappable LLM providers — a plausible shortcut, and the source of the
-  control/audio transport split used here ([voice](architecture/voice.md)).
+  control/audio transport split used here ([voice](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/voice.md)).
 - **`akdeb/OpenToys`** (formerly ElatoAI) — ESP32-S3 realtime AI toys.
 - **`StarmoonAI/Starmoon`** — empathic AI companion hardware and software.
 - **ESP-SparkBot** (Espressif) — official open-source S3 conversation robot.
@@ -52,7 +52,7 @@ you read only two things here, read the first two.
   **hunger, affection and energy**, and whose agent layer lets Claude Code,
   OpenCode, Cursor and other MCP clients drive the pet's reactions through an
   MCP server. Substantially the same idea as
-  [MCP § inbound](architecture/mcp.md#inbound-the-daemon-as-an-mcp-server),
+  [MCP § inbound](guides/using-obp-with-mcp.md),
   already built. Read it before writing `obp-mcp`.
 - **`geeks-accelerator/animal-house-ai-tamagotchi`** — MIT, tiny, and sharply
   framed: *"Tamagotchi for AI agents"*, delivered purely as an MCP server
@@ -69,7 +69,7 @@ you read only two things here, read the first two.
   cells over nine named states, with a public gallery and a generator. Nous
   Research's Hermes ships an MIT Python decoder and terminal renderer for it
   (`agent/pet/render.py`), directly reusable for the
-  [terminal body](architecture/tui.md). Its nine states do not map cleanly
+  [terminal body](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/terminal-body.md). Its nine states do not map cleanly
   onto this project's expression vocabulary, so adopting it is a deliberate
   choice, not a drop-in.
 
@@ -79,7 +79,7 @@ you read only two things here, read the first two.
     or the agent's behavior"*. No stats, no persistence, no tick, no tools,
     and no route on its HTTP API. What Hermes usefully offers this project is
     an **OpenAI-compatible API server**, not a pet
-    ([brain](architecture/brain-contract.md#the-four-kinds)).
+    ([brain](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/brain.md)).
 
 ## Embodied companions
 
@@ -99,7 +99,7 @@ you read only two things here, read the first two.
 - `Ido-Levi/claude-code-tamagotchi`, `vincent-k2026/codachi` — pets living in
   a terminal statusline, reacting to tool events. A good source of ideas for
   *what the pet should have opinions about*, and the closest prior art to
-  the [terminal body](architecture/tui.md): a pet that lives where the work
+  the [terminal body](https://github.com/jcarranz97/desk-buddy/blob/main/docs/architecture/terminal-body.md): a pet that lives where the work
   happens is a different feeling from one that lives on a desk, and the
   terminal ones tend to be tied to a single tool's lifecycle. This pet is
   not — it is the same creature the ESP32 and Telegram see, and it outlives
