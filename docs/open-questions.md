@@ -114,3 +114,41 @@ obviously right:
   stricter design is request-scoped, as in NFSv4's current filehandle, which is
   unset at the start of every request; that is what a multi-user host would
   need and this one does not have.
+
+## How an event reaches a brain that is not looking
+
+Experiment 005 gets a button press from the body to the *host*. What it does
+not solve is the last hop: from the host to a brain that is not currently
+paying attention. Two deployment shapes need different answers, and the
+protocol should stay out of both.
+
+**The body is attached to someone's session.** A person is already using
+Claude Code or OpenCode for their own work and adds a robot as an MCP server.
+They are present and driving; the body is an actuator. Polling is *legitimate*
+here — "wait until I press the button" is a reasonable thing to ask an agent
+that is sitting there anyway, and `obp__wait_for_event` is the right tool
+rather than a workaround.
+
+**The body owns a session.** The robot has its own computer running a
+long-lived agent, and input comes *from* the robot — a button, a spoken
+sentence. Nobody is typing. Polling is wrong here: something must be awake on
+the robot's behalf, and the event has to arrive as a turn. This is the shape a
+Telegram bot has, and the reason it works is that a process is always listening
+and injects the message.
+
+**The body is identical in both.** Same firmware, same events on the wire.
+What differs is entirely host-side, which is the argument that this belongs in
+a reference host — desk-buddy — rather than in the specification.
+
+Research into the transport half is unambiguous: **MQTT 5 persistent sessions
+already solve the offline-consumer problem**, and OBP's MQTT binding is one
+CONNECT flag away from it. `Clean Start = 0`, a `Session Expiry Interval`
+covering the worst expected outage, QoS 1, and — the part everyone gets wrong —
+a *stable client id*, since the session is keyed on it and a randomised id on
+each boot silently discards the whole mechanism. Retained messages answer "what
+is true now"; the persistent session answers "what happened while I was away",
+and a body wants both. Message Expiry Interval matters too: a brain that
+reconnects after six hours should not act on a six-hour-old button press.
+
+The open part is not the transport. It is what turns a queued event into a turn
+in an agent's context, and whether OBP should say anything at all about it.
