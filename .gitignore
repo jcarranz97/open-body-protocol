@@ -29,3 +29,6 @@ managed_components/
 .DS_Store
 .idea/
 *.swp
+
+# Experiment build output
+experiments/**/build/

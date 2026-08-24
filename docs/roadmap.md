@@ -1,6 +1,6 @@
 # Roadmap
 
-Five phases to v1, then v2. **Each phase is independently playable — do not
+Six phases to v1, then v2. **Each phase is independently playable — do not
 start the next until the current one is boring.** That rule is the whole
 schedule; the phase contents are negotiable, the ordering is not.
 
@@ -10,14 +10,15 @@ as `FR-NNN`.
 ```mermaid
 flowchart LR
     P0["Phase 0<br/>daemon only<br/>no hardware"]
+    P0B["Phase 0b<br/>terminal body<br/>still no hardware"]
     P1["Phase 1<br/>dumb body"]
     P2["Phase 2<br/>the pet speaks"]
     P3["Phase 3<br/>brain in the loop"]
-    P4["Phase 4<br/>homelab senses"]
+    P4["Phase 4<br/>senses"]
     P5["Phase 5<br/>push-to-talk voice"]
     V2["v2<br/>BLE keychain"]
 
-    P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> V2
+    P0 --> P0B --> P1 --> P2 --> P3 --> P4 --> P5 --> V2
 
     classDef now fill:#4f46e5,stroke:#3730a3,color:#fff
     classDef risk fill:#166534,stroke:#14532d,color:#fff
@@ -30,6 +31,9 @@ flowchart LR
 - **Phase 0 costs €0 and is the one most likely to kill the project.** That
   is exactly why it goes first. If a Tamagotchi is not fun in a chat window,
   a screen will not save it.
+- **Nothing before Phase 1 requires buying anything.** Phases 0 and 0b give
+  a complete pet on a laptop, which is also the version most people who hear
+  about this will ever run.
 - **Buy the voice-capable board in Phase 1** (FR-110). The microphone sits
   unused until Phase 5. Retrofitting means redoing the enclosure and the
   pinout for a few euros of savings.
@@ -40,7 +44,10 @@ flowchart LR
 
 ## Phase 0 — daemon only, no hardware
 
-- [ ] Container: Python + SQLite, one pod in the homelab (NFR-006)
+- [ ] Container: Python + SQLite, one image, one volume — runnable on a
+      laptop, a Pi or a cluster (FR-160, FR-164, NFR-006)
+- [ ] `docker compose up -d` brings up daemon + broker and produces a working
+      pet with no credentials configured (FR-163, FR-165, NFR-023)
 - [ ] State schema, `pets` and `events` tables (FR-022, FR-026)
 - [ ] Decay tick on a 60 s loop, computed from elapsed time (FR-020, FR-021)
 - [ ] Wire up the existing Telegram bot: `/status` `/feed` `/play` `/clean`
@@ -50,13 +57,42 @@ flowchart LR
 
 **Exit criterion:** play it on Telegram alone for a week.
 
+## Phase 0b — the terminal body
+
+The pet gets a face without anyone buying hardware, and the protocol gets a
+second implementation before the firmware exists. See
+[terminal body](architecture/tui.md).
+
+- [ ] Client package: MQTT transport, state cache, event queue with ULIDs,
+      TTL handling, reconnect backoff (FR-131)
+- [ ] Rich TUI: face panel, stat bars, speech bubble, footer (FR-127)
+- [ ] Keypress reader in raw mode; `feed` / `play` / `clean` / `pet`, and a
+      text prompt for `talk` (FR-129)
+- [ ] Registration with a distinct id and an honest `caps` list (FR-121)
+- [ ] Local state cache and offline rendering, mirroring DEGRADED (FR-124,
+      FR-125)
+- [ ] `--ascii` and `NO_COLOR` paths (FR-128)
+- [ ] Idle cadence and redraw discipline (NFR-014)
+- [ ] `--solo`: the core in-process against a local SQLite file, no broker
+      (FR-122, FR-123, NFR-016)
+- [ ] `uvx tamalab tui` published and working from a clean machine (FR-130)
+
+**Exit criterion:** you leave it open in a pane for a week without closing
+it, and somebody else runs `uvx tamalab tui --solo` and has a pet without
+asking you anything.
+
 ## Phase 1 — dumb body
 
-- [ ] Mosquitto on the LAN; one user for the daemon, one per device (FR-016)
+- [ ] A broker: bundled in the compose file by default, or an existing one
+      by configuration; one user for the daemon, one per device (FR-016,
+      FR-163). On an HTTP-only cluster ingress, prefer MQTT over WebSocket
+      ([deployment](architecture/deployment.md))
 - [ ] Daemon publishes retained `tama/pet/state` on every change (FR-030)
 - [ ] ESP32: WiFi + MQTT + LWT, subscribe to state, render a face (FR-011)
 - [ ] `Transport` interface in firmware, one implementation (FR-061)
 - [ ] Buttons → `tama/dev/<id>/event` with ULID and timestamp (FR-013)
+- [ ] The TUI from Phase 0b sees the device's events, and vice versa — one
+      pet, two bodies (FR-120, FR-126)
 - [ ] NVS cache and DEGRADED mode (FR-040, FR-041) — unplug the daemon and
       confirm the pet keeps animating
 - [ ] Offline event queue with `clock_confident` (FR-042, FR-043)
@@ -83,6 +119,7 @@ later.
       (FR-070)
 - [ ] `character.md`, structured JSON output, strict validation and enum
       clamping (FR-072)
+- [ ] Length clamping in the daemon — the schema will not do it (FR-143)
 - [ ] Fallback chain on any parse failure (FR-074, NFR-005)
 - [ ] `providers.yaml` and the routing table (FR-073) — even with one
       provider in it
@@ -94,15 +131,30 @@ later.
 **Exit criterion:** a week of use under ~40 calls a day, and you are
 surprised by something it said.
 
-## Phase 4 — homelab senses
+## Phase 4 — senses
 
-- [ ] `POST /event` webhook and the mapping config (FR-100, FR-101)
+The phase where the pet stops being self-contained. Both MCP directions and
+the sense tier land here, in this order — each is independently useful, so
+stop whenever it stops being fun.
+
+- [ ] `POST /event` webhook and the mapping config (FR-100, FR-101) — a
+      `curl` from a git hook counts, a homelab is not required
 - [ ] Collapse repeated events so a flapping service cannot drive the pet
       (FR-103)
-- [ ] MCP tools so the cloud tier can query real infrastructure (FR-078)
+- [ ] **MCP client**: the daemon reaches MCP servers itself, one call per
+      utterance (FR-150, FR-151)
+- [ ] **MCP server** `tamalab-mcp`: pet state and interactions as tools, so a
+      coding agent can be a caretaker (FR-150, FR-152, FR-153)
+- [ ] If deploying beside agents in a cluster, follow the egress precedent
+      rather than opening anything inbound (NFR-021, [deployment](architecture/deployment.md))
+- [ ] **Sense tier**, optional and absent by default: one harness behind the
+      `Sensor` protocol, `agentic` timeout, fired on `homelab` and explicit
+      asks only (FR-140, FR-141, FR-142, NFR-018, NFR-019, NFR-020)
 - [ ] OTA over WiFi with hash verification (FR-034, NFR-012)
 
-**Exit criterion:** the pet got visibly upset about something real.
+**Exit criterion:** the pet got visibly upset about something real, said
+something *specific* about why, and you fed it from a coding session without
+touching the device.
 
 ## Phase 5 — push-to-talk voice
 

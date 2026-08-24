@@ -56,7 +56,20 @@ silent, and then answered differently the next time.
 **Decide in Phase 0.** It costs a sentence and prevents an inconsistency the
 owner will definitely notice.
 
-## 6. What is it called?
+## 6. Does the terminal body get its own art, or the device's?
+
+The device draws 1-bit sprites; the terminal draws characters. They share an
+`expression` vocabulary but nothing else, so the same `sad_blink` will not
+look like the same creature unless somebody makes it.
+
+Cheap answer: draw the terminal art *from* the sprites — the OLED is 128×64
+1-bit, and half-block characters map onto that almost directly, which would
+make the two faces genuinely identical at a quarter of the effort of drawing
+twice.
+
+**Decide in Phase 0b**, before there is a second art set to keep in sync.
+
+## 7. What is it called?
 
 TAMALAB is a working codename. The docs avoid baking it into the protocol —
 topics are `tama/`, which is short enough to live with, and no payload field

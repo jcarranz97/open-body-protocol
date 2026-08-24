@@ -14,7 +14,7 @@ flowchart LR
         Q["event queue<br/>ULID · NVS"]
     end
 
-    subgraph Pod["pet-daemon · one container"]
+    subgraph Pod["pet-daemon · one container, any machine"]
         direction TB
         ADP["MQTT adapter"]
         BUS["internal event bus"]
@@ -41,27 +41,49 @@ Read it as three rings. The **core** knows about a pet, its stats and its
 event log, and nothing about MQTT, Telegram or HTTP. The **bus** carries
 events in and `state`/`say` out. Everything else is an **adapter** at the
 edge, and adding one is additive: Telegram was the first, MQTT the second,
-a BLE relay would be the third (v2), a web dashboard the fourth.
+the terminal body rides the second one for free, a BLE relay would be the
+third (v2), a web dashboard the fourth.
 
 That layering is not decoration. It is what makes Phase 0 — a pet that is
 playable on Telegram with no hardware at all — the same code as Phase 1
 rather than a throwaway prototype (FR-002, FR-060).
 
+## Bodies
+
+A **body** is anything that renders the pet and reports events. There are
+three in v1 and none of them is primary:
+
+| Body | Transport | Renders | Inputs |
+|---|---|---|---|
+| ESP32-S3 desk unit | MQTT + WSS audio | Sprites in flash | Buttons, IMU, push-to-talk |
+| Terminal ([TUI](tui.md)) | MQTT, or an in-process bus in solo mode | Rich, art in the client | Keypresses, a text prompt |
+| Telegram | Bot API | Text | Commands, free text |
+
+They differ in medium and in `caps`, never in contract: same events, same
+ULIDs, same TTLs, same "the daemon owns the truth" rule (FR-120). Adding a
+fourth costs nothing in the core (FR-064), which is what makes this a
+framework rather than three programs sharing a broker — the checklist is in
+[the TUI page](tui.md#writing-another-body).
+
+**The hardware is therefore optional.** A user with only a terminal has the
+whole pet; a user with only Telegram has it too, minus a face. That is not a
+concession, it is the point of putting the truth on a server.
+
 ## What runs where
 
-| Concern | Device | Daemon |
+| Concern | Body | Daemon |
 |---|---|---|
 | Authoritative stats, mood, age | — | ✔ |
 | Event log, memory, journal | — | ✔ (durable) |
-| Queue of unsent events | ✔ (ring buffer, NVS) | — |
-| Sprites and animation | ✔ (flash) | — |
-| Choosing *which* sprite | — | ✔ (`expression`) |
+| Queue of unsent events | ✔ (NVS ring buffer, or a file) | — |
+| Art — sprites, ASCII frames | ✔ (flash, or the client package) | — |
+| Choosing *which* art | — | ✔ (`expression`) |
 | LLM calls | — | ✔ |
 | STT / TTS | — | ✔ |
 | Local decay while offline | ✔ (prediction only) | ✔ (truth) |
 | Secrets (bot token, API keys) | — | ✔ |
 
-The device computes decay only as a *prediction* so the face keeps moving
+A body computes decay only as a *prediction* so the face keeps moving
 while disconnected. On reconnect the server's state overwrites it silently —
 there is no merge, ever (FR-023). The device's only real contribution is its
 timestamped event log.
@@ -102,7 +124,17 @@ One process, five concerns:
 | `brain` | Turn a trigger + context into one JSON object | Routed and rate-limited ([brain](brain.md)) |
 | `adapters` | MQTT, Telegram, `POST /event`, WSS audio | The only code that knows a wire format |
 
-**SQLite, not Postgres.** One pet, one owner, a write every 60 seconds and a
+**The core is importable, not just runnable.** `tamalab tui --solo` runs
+exactly this core in-process, with a direct bus connection where the MQTT
+adapter would be, against a SQLite file on the user's laptop (FR-122). It is
+the same simulation code — not a second implementation, which is the only
+version of this idea worth having (FR-123). If the core ever needs to know it
+is running inside a TUI, the rings have leaked.
+
+**SQLite, not Postgres.** The deciding argument is
+[deployment](deployment.md): a database server is more infrastructure than
+the thing it stores, and it would put a floor under where the pet can live.
+One pet, one owner, a write every 60 seconds and a
 handful of reads. A database server would be more infrastructure than the
 thing it stores. It is also what makes the daemon a single container with a
 single volume, which matters for a project whose failure mode is *the owner
@@ -146,3 +178,4 @@ creature and becomes a status light.
 | STT/TTS times out | Confused animation and a canned line — never a hang |
 | Broker down | Device DEGRADED, daemon keeps simulating; state reconciles on reconnect |
 | Device unplugged overnight | Stale `say` messages expire on `ttl_s`; no backlog replay |
+| No hardware at all | Terminal and Telegram bodies are unaffected — the pet is complete without an ESP32 |

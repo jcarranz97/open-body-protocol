@@ -1,12 +1,14 @@
 # TAMALAB
 
-**TAMALAB** is an AI Tamagotchi: an ESP32-S3 desk pet whose brain, memory and
-personality run as a container in a homelab, reachable from both the device
-and Telegram. The device is a **body** — display, buttons, buzzer, mic,
-speaker — and nothing else.
+**TAMALAB** is an AI Tamagotchi whose brain, memory and personality run as a
+single container — on a laptop, a mini PC, a Raspberry Pi, or a homelab
+cluster; the deployment is the owner's choice and the pet is identical in
+each. It has three **bodies** — an ESP32-S3 desk unit, a
+terminal application, and a Telegram bot — and none of them is primary. The
+hardware is optional.
 
 **Status: Phase 0.** This repository is documentation only. There is no
-`daemon/` and no `firmware/` yet. Do not scaffold either until the
+`daemon/`, no `client/`, no `tui/` and no `firmware/` yet. Do not scaffold either until the
 architecture documents they implement are settled; the whole point of the
 phase order in `docs/roadmap.md` is that Phase 0 is playable on Telegram
 alone and costs nothing.
@@ -35,9 +37,21 @@ change would violate one of these, say so rather than working around it.
    interface, the daemon consumes *events* and emits *state*/*say* over an
    internal bus with MQTT as an edge adapter. v1 has one implementation each.
    v2 adds BLE as an addition, not a rewrite.
-6. **Art lives in flash.** The server sends an `expression` and an
-   `animation` id — never sprite data.
-7. **The mic opens only while the push-to-talk button is held.** A firmware
+6. **Art lives in the body.** The server sends an `expression` and an
+   `animation` id — never sprite data, and never ASCII either. The firmware
+   keeps sprites in flash; the terminal keeps frames in the client package.
+7. **A body is defined by the protocol it speaks, not by being hardware.**
+   The terminal client is a body under the same contract, not a debug tool
+   or a mock. Anything it cannot do from `state` + `say` alone is a hole in
+   the protocol — fix the protocol, never special-case the daemon.
+8. **Solo mode imports the core; it does not reimplement it.** `tui --solo`
+   runs the same simulation code in-process. Two implementations of decay
+   would be two pets.
+9. **One container, one volume, no orchestrator.** A homelab is a deployment
+   option, never an assumption: if a design step would require Kubernetes, a
+   reverse proxy, a public hostname or an inbound port, it is wrong. The
+   floor is a Raspberry Pi running `docker compose up`.
+10. **The mic opens only while the push-to-talk button is held.** A firmware
    invariant, not a policy. Privacy here is structural.
 
 ## Documentation
@@ -81,8 +95,8 @@ on them.
 
 | Term | Means |
 |---|---|
-| **body** | A physical device. v1 has one (the desk unit); v2 adds the keychain. |
-| **daemon** | The homelab pod. The pet's brain, memory and authority. |
+| **body** | Anything that renders the pet and reports events: the desk unit, the terminal, Telegram. v2 adds the keychain. Not a synonym for hardware. |
+| **daemon** | The container that owns the core. The pet's brain, memory and authority, wherever it runs. |
 | **state** | The full snapshot of §4.3 — stats, mood, stage. Server→device, retained. |
 | **say** | One utterance plus an expression, animation and sound. Perishable (`ttl_s`). |
 | **event** | Something that happened to the pet: a button, a shake, a voice turn, a webhook. Carries a ULID. |

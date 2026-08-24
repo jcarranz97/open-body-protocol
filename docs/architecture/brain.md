@@ -10,6 +10,58 @@ whether any model at all — is behind it.
     wait on one.** The brain is a component behind a narrow interface, and the
     canned-line table is always available as the zeroth provider.
 
+## Two tiers: the voice and the senses
+
+The single most important decision on this page is that these are **not the
+same component**, even though both involve a model.
+
+```mermaid
+flowchart TB
+    TRIG["trigger<br/>idle · conversation · journal · homelab"]
+
+    subgraph Sense["Sense tier — slow, tool-using, optional"]
+        H["agent harness<br/>Agent SDK · OpenCode · Hermes"]
+        MCPC["MCP client<br/>homelab tools"]
+    end
+
+    subgraph Voice["Voice tier — fast, schema-guaranteed, required"]
+        M["small model<br/>native structured output"]
+        C["CannedBrain<br/>always reachable"]
+    end
+
+    FACT["a small structured fact<br/>{disks_ok: false, hottest_c: 71}"]
+    SAY["say — line ≤140 chars<br/>+ expression + animation"]
+
+    TRIG -->|"needs the world"| Sense
+    TRIG -->|"always"| Voice
+    H --> MCPC
+    Sense --> FACT
+    FACT -->|"context, not output"| Voice
+    M --> SAY
+    C --> SAY
+
+    classDef core fill:#4f46e5,stroke:#3730a3,color:#fff
+    class M,C core
+```
+
+**The voice tier is the pet talking.** It is required, it is on the critical
+path, and its budget is a couple of seconds. A small model with native
+structured outputs answers it for a fraction of a cent, and `CannedBrain`
+answers it when nothing else can.
+
+**The sense tier is the pet finding something out.** It is optional, it is
+never on the critical path, and it may take ten seconds because nobody is
+waiting: it produces a *fact*, which becomes context for the voice tier on
+the next utterance. This is where an agent harness, tool calling and MCP
+belong (FR-140).
+
+Collapsing the two — routing every idle chirp through an agent loop — is the
+mistake this design exists to avoid. A harness is optimised for long,
+exploratory, many-turn work; a pet needs eleven words now. Ask a harness for
+eleven words and you pay for a large system prompt, a tool-definition block
+and a loop that may decide to take four turns, on the *most* expensive
+provider you have (FR-141).
+
 ## The abstraction
 
 The pet does not need "an LLM". It needs *one small JSON object*. That is a
@@ -22,7 +74,7 @@ class Capabilities:
     structured: str      # none | json_mode | json_schema | grammar | native_strict
     tools: bool
     context_tokens: int
-    latency_class: str   # fast | slow
+    latency_class: str   # fast | slow | agentic
     cost_class: str      # free | cheap | paid
     privacy: str         # local | cloud
 
@@ -30,7 +82,17 @@ class Brain(Protocol):
     name: str
     caps: Capabilities
     def respond(self, ctx: PetContext) -> PetResponse: ...
+
+class Sensor(Protocol):
+    """Sense tier. Returns a fact, never an utterance."""
+    name: str
+    caps: Capabilities
+    def sense(self, question: str, schema: dict) -> dict: ...
 ```
+
+`latency_class` has three values, not two, because `slow` already means "a
+14B model on CPU" at 15 s. An agentic turn is a different order of magnitude
+and gets its own budget (FR-142).
 
 Three implementations cover essentially the whole world:
 
@@ -83,6 +145,18 @@ constrain → parse → validate against schema → clamp enums → on any failu
 firmware has no sprite for. Clamp to the nearest legal value, log it, carry
 on. The device gets a face either way.
 
+!!! warning "The schema will not enforce the 140-character limit"
+    Constrained decoding covers *shape* — keys, types, enums. It does not
+    cover **`maxLength`**, `minLength`, `pattern` or numeric bounds: those
+    are silently stripped by the providers and, at best, folded into a
+    field description and validated client-side after generation.
+
+    So `line` being ≤140 characters is **the daemon's job, not the
+    schema's** (FR-143). Put the limit in the prompt, keep it in the schema
+    description for the model's benefit, and then clamp it yourself — one
+    retry, then truncate on a word boundary. A `line` that arrives at 400
+    characters is a normal Tuesday, not an incident.
+
 ## Routing
 
 Different jobs deserve different models. Route by trigger, not by preference
@@ -93,8 +167,12 @@ Different jobs deserve different models. Route by trigger, not by preference
 | Idle chatter, mood transitions | **local** | Free, private, unlimited; quality barely matters for 12 words |
 | Owner conversation (Telegram, voice) | **cloud** | This is the moment the pet earns its existence |
 | Daily journal, memory writes | **cloud** | Long-lived artefacts; worth the tokens |
-| Homelab event reactions | **local** | Templated and frequent |
+| External event reactions | **local** | Templated and frequent |
 | Anything, when the primary fails | **canned** | Never blocks |
+
+The `homelab` trigger keeps its name because that is the archetypal source,
+but it fires for anything that posts to the webhook — a git hook on a laptop
+counts ([integrations](integrations.md#external-events)).
 
 Config, not code:
 
@@ -102,7 +180,7 @@ Config, not code:
 providers:
   local:
     kind: openai_compat
-    base_url: http://ollama.homelab.lan:11434/v1
+    base_url: http://ollama.dev.lan:11434/v1
     model: qwen3:8b
     caps: { structured: json_schema, tools: false, privacy: local, cost_class: free }
   cloud:
@@ -115,15 +193,104 @@ routes:
   conversation: [cloud, local, canned]
   journal:      [cloud, canned]
   homelab:      [local, canned]
+
+sensors:                     # the sense tier — optional, absent by default
+  homelab:
+    kind: agent_sdk          # agent_sdk | opencode | openai_compat
+    caps: { latency_class: agentic, tools: true, privacy: cloud }
+    timeout_s: 60
+    ask_on: [homelab, conversation]   # never `idle`
 ```
 
 Going 100% local for privacy, or 100% cloud while the GPU is busy, is then a
 YAML edit and a restart. Every chain ends in `canned` — the loader should
 refuse to start if one does not (FR-074).
 
+**`sensors:` is a separate key from `providers:` on purpose.** A sensor can
+never appear in a `routes:` chain, because a route chain is the thing the
+device is waiting on. That separation is what makes "make it more powerful"
+a configuration change rather than a redesign: delete the `sensors:` block
+and the pet is exactly the pet it was, just less well-informed.
+
+!!! note "The local tier is optional, and often absent"
+    A local model server is a *nice* thing to have and a poor thing to
+    require: many hosts have no GPU, and plenty of setups outsource
+    inference entirely. Nothing breaks when `local` is unreachable, because
+    a route is a chain — `idle: [local, canned]` with nothing listening on
+    `local` is a pet that uses canned lines for idle chatter, which is what
+    it would mostly do anyway. Set `providers:` to what you actually run.
+
 Model IDs are config values and change over time. Current Anthropic IDs are
 `claude-opus-5`, `claude-sonnet-5` and `claude-haiku-4-5`; the daemon never
 hardcodes one.
+
+## The sense tier
+
+A sensor answers a question about the world and returns a **fact**, in a
+schema the daemon defines. It never writes the pet's line, never picks an
+expression, and never talks to a body.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant HL as Homelab (restic)
+    participant D as Daemon
+    participant S as Sensor (harness)
+    participant MCP as MCP servers
+    participant V as Voice tier
+    participant B as Body
+
+    HL->>D: POST /event {source: restic, severity: error}
+    D->>D: apply mapping — health −15
+    D-->>B: state (retained) — expression: sick
+    Note over D,B: The pet already reacted. Nothing is waiting on the sensor.
+
+    D->>S: sense("what is wrong with the backups?", FACT_SCHEMA)
+    activate S
+    S->>MCP: tools/call get_homelab_status
+    MCP-->>S: {last_backup: "3d ago", disk_pct: 94}
+    S->>MCP: tools/call read_logs("restic")
+    MCP-->>S: "repository locked"
+    S-->>D: {cause: "stale lock", days_since_backup: 3}
+    deactivate S
+
+    D->>V: respond(state + fact + character.md)
+    V-->>D: {line: "your backups have been stuck 3 days...", expression: "grumpy"}
+    D-->>B: say (ttl_s: 45)
+```
+
+Read step 3 carefully: **the pet reacts before the sensor answers.** The
+webhook already moved `health` and published a `sick` face; the sensor only
+decides what the pet says *about* it, seconds later. If the sensor times out,
+the pet still got upset — it just says something vaguer (NFR-019).
+
+### Which harness
+
+| Option | Structured output | Local models | Deployment | Verdict |
+|---|---|---|---|---|
+| **Claude Agent SDK** | Native, first-class | **No — Claude only** | Python package, spawns a bundled CLI subprocess | **Start here.** Python-native, in-process MCP servers, and a warm client amortises the subprocess away |
+| **OpenCode** | Claimed; verify | **Yes** — Ollama, LM Studio, any OpenAI-compatible base URL | `opencode serve`, OpenAPI spec at `/doc`, no official image | Take it if provider independence or fully-local inference outranks polish |
+| **Hermes** | **None found** | Yes, ~37 providers | Docker, already in the homelab | A cheap spike — it drops into `OpenAICompatBrain` with only a `base_url` |
+| **Plain API + MCP client** | Native | Yes | Nothing to deploy | The dark horse, and possibly the right answer — see [MCP](mcp.md) |
+
+Three findings that decide this, all of them non-obvious:
+
+- **A harness may not own the persona.** Hermes layers a `system` message *on
+  top of* its own core prompt by design, so the agent keeps its tools and
+  skills. Your `character.md` becomes an appendix to a coding-agent prompt —
+  survivable for a sensor, disqualifying for the voice.
+- **A harness may not guarantee a schema.** Hermes' API server exposes no
+  `response_format`, `json_schema` or `strict` surface, which puts you back on
+  "ask for JSON and retry" — the weakest row in the table above, on the most
+  expensive provider.
+- **A harness inherits its host's trust.** If you take the Claude Agent SDK,
+  `setting_sources=[]` is mandatory: otherwise a session loads hooks from the
+  working directory's settings file and connects the servers in its
+  `.mcp.json` with no trust prompt. A daemon that runs in a directory it did
+  not author must not do that (NFR-020).
+
+You do not need any of them to reach MCP servers, which is the point of the
+[MCP page](mcp.md).
 
 ## Portability details that actually bite
 
@@ -140,7 +307,13 @@ hardcodes one.
   regardless of who answered (FR-076).
 - **Latency.** A pet tolerates 2–5 s far better than a chatbot does — show a
   thinking animation. But a 14B model on CPU can take 30 s. Hard timeout per
-  tier: local 8 s, cloud 15 s, then fall through (NFR-002).
+  class, then fall through (NFR-002, NFR-018):
+
+  | `latency_class` | Timeout | Used by |
+  |---|---|---|
+  | `fast` | 8 s | Local models, small cloud models — the voice tier |
+  | `slow` | 15 s | Large cloud models |
+  | `agentic` | 60 s | The sense tier only, never the voice |
 
 ## Budget discipline
 
@@ -210,11 +383,21 @@ translated per provider:
 This is what turns it from a chatbot with a sprite into something that feels
 continuous.
 
-Implement them as an **MCP server** rather than inline function definitions.
-MCP is the closest thing to a neutral standard here: it can be consumed
-directly by agent tooling, called by the daemon's own code for providers that
-have no tool support, and — if the firmware ever takes the `xiaozhi` path,
-which already speaks MCP — reused from the device side too.
+Implement them as an **MCP server** rather than inline function definitions —
+and, separately, be an MCP **client** of the homelab's own servers. Those are
+two independent capabilities and the daemon wants both; they have their own
+page ([MCP](mcp.md)).
+
+Two consequences worth stating here, because they constrain this section:
+
+- **Expose pet state as a tool, not a resource.** `get_pet_state()` reads
+  like a resource, but the hosted MCP connectors are tools-only, so a
+  resource would be invisible to a whole class of consumer.
+- **A pet MCP server cannot borrow the consumer's model.** Server-initiated
+  sampling was deprecated in the 2026-07-28 spec revision, so the idea of an
+  agent's own model voicing the pet is closed. **Generation stays in this
+  process, permanently** — which is a good outcome, since it is the only way
+  `character.md` and the fallback chain stay in charge.
 
 For the local tier: no tools at all. Pre-fetch state, top memories and recent
 journal into the prompt and let the small model just write a line.

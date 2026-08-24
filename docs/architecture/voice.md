@@ -27,7 +27,7 @@ MQTT is a message bus, not a stream. Control stays on MQTT; audio gets its
 own channel, opened per utterance (FR-080).
 
 ```text
-button DOWN  → open WSS to wss://pet.homelab.lan/audio
+button DOWN  → open WSS to wss://pet.dev.lan/audio
              → send {"type":"start","fmt":"pcm16","sr":16000}
              → stream binary frames (20 ms = 640 bytes) while held
 button UP    → send {"type":"end"}
@@ -86,7 +86,7 @@ class Synthesiser(Protocol):
 
 They live in the same `providers.yaml` as the brain, with the same fallback
 chains. **Local-only is a completely viable full configuration**: Whisper
-small + Qwen + Piper all run on one modest homelab box, and then no audio
+small + Qwen + Piper all run on one modest machine, and then no audio
 ever leaves the house.
 
 !!! tip "On voice choice"

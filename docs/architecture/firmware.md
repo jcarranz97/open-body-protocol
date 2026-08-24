@@ -114,7 +114,7 @@ timestamp at the moment it happens, not at the moment it is sent.
 ## OTA
 
 Do it in Phase 4, while the device is still a desk unit on a trusted LAN:
-plain HTTP to a URL on the homelab, with the image's SHA-256 in the `cmd`
+plain HTTP to a URL on your own network, with the image's SHA-256 in the `cmd`
 payload and verified before flashing (NFR-012).
 
 It is trivial now and miserable later — and every subsequent phase gets

@@ -3,8 +3,8 @@
 Nothing found does exactly *ESP32 pet + self-hosted brain + Telegram +
 homelab events*, but every individual piece exists and is worth reading
 before writing code. The gap is narrow enough to be worth being honest about:
-what makes this project its own is the [homelab
-senses](architecture/integrations.md#homelab-events), not the Tamagotchi.
+what makes this project its own is the [external
+events](architecture/integrations.md#external-events), not the Tamagotchi.
 
 ## Closest in spirit
 
@@ -39,8 +39,78 @@ senses](architecture/integrations.md#homelab-events), not the Tamagotchi.
   with a WebSocket API.
 - `derdacavga/Esp32-Tamagotchi` — ESP32-C3 + ST7789, modular sprite pipeline.
 
+## Agent-driven pets — the closest prior art of all
+
+This is the crowded part, and it was not obvious until we went looking. If
+you read only two things here, read the first two.
+
+- **[`alvinunreal/openpets`](https://github.com/alvinunreal/openpets)** —
+  MIT, active. A local-first pet platform whose virtual-pet plugin tracks
+  **hunger, affection and energy**, and whose agent layer lets Claude Code,
+  OpenCode, Cursor and other MCP clients drive the pet's reactions through an
+  MCP server. Substantially the same idea as
+  [MCP § inbound](architecture/mcp.md#inbound-the-daemon-as-an-mcp-server),
+  already built. Read it before writing `tamalab-mcp`.
+- **`geeks-accelerator/animal-house-ai-tamagotchi`** — MIT, tiny, and sharply
+  framed: *"Tamagotchi for AI agents"*, delivered purely as an MCP server
+  with no HTTP at all. **The pet is the tool surface and the agent is the
+  caretaker** — the exact inverse of this design, where the pet has its own
+  brain and merely accepts visitors. Worth reading to be sure which way round
+  you want it.
+- **Claude Code Channels** — a first-party extension point where *a channel
+  is an MCP server* pushing external events into a running session, with
+  Telegram and Discord plugins shipped and a documented build-your-own path.
+  A "TAMALAB channel" is a legitimate design rather than a hack.
+- **[`petdex`](https://github.com/crafter-station/petdex)** — not a pet
+  project but a **sprite format**: `pet.json` plus a spritesheet of 192×208
+  cells over nine named states, with a public gallery and a generator. Nous
+  Research's Hermes ships an MIT Python decoder and terminal renderer for it
+  (`agent/pet/render.py`), directly reusable for the
+  [terminal body](architecture/tui.md). Its nine states do not map cleanly
+  onto this project's expression vocabulary, so adopting it is a deliberate
+  choice, not a drop-in.
+
+!!! note "Hermes 'pets' are not pets"
+    Nous Research's `hermes-agent` has a documented pets feature, and it is
+    **cosmetic sprite mascots only** — *"no effect on prompt caching, tokens,
+    or the agent's behavior"*. No stats, no persistence, no tick, no tools,
+    and no route on its HTTP API. What Hermes usefully offers this project is
+    an **OpenAI-compatible API server**, not a pet
+    ([brain](architecture/brain.md#which-harness)).
+
+## Embodied companions
+
+- **`anthropics/claude-desktop-buddy`** — a first-party ESP32-S3 desk
+  companion on ~$30 hardware, where you approve or deny the agent's actions
+  with **physical buttons over BLE**, the interaction staying local. The
+  nearest thing to an official version of this form factor.
+- **`elliotboney/shelldon`** — MIT. *"A tiny AI creature that lives on an
+  E-Ink screen, chats with a remote LLM brain."* Almost unknown, and it is
+  precisely this project's thin-device / remote-brain split.
+- **Espressif's own MCP client and server examples for ESP32** — relevant if
+  the body should one day be a tool an agent calls, rather than a thing that
+  calls tools.
+
 ## Software-only, for personality inspiration
 
 - `Ido-Levi/claude-code-tamagotchi`, `vincent-k2026/codachi` — pets living in
   a terminal statusline, reacting to tool events. A good source of ideas for
-  *what the pet should have opinions about*.
+  *what the pet should have opinions about*, and the closest prior art to
+  the [terminal body](architecture/tui.md): a pet that lives where the work
+  happens is a different feeling from one that lives on a desk, and the
+  terminal ones tend to be tied to a single tool's lifecycle. This pet is
+  not — it is the same creature the ESP32 and Telegram see, and it outlives
+  whatever is running in the next pane.
+
+## Licensing, before you copy anything
+
+This repository is MIT. Two traps found while researching the above:
+
+- ⚠️ **`MaliosDark/Sablina-Tamagotchi-ESP32` is GPL-2.0** — contagious. It is
+  listed here because it is worth reading, not because it is worth copying.
+- ⚠️ **Several agent↔Telegram bridges carry no licence at all**, which means
+  no permission to reuse, however useful they look. Treat an unlicensed
+  repository as a read-only reference.
+
+Where a project is named above without a licence note, check before
+vendoring, not after.

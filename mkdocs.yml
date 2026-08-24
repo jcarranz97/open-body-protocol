@@ -38,11 +38,14 @@ nav:
   - Prior Art: prior-art.md
   - Architecture:
     - Overview: architecture/overview.md
+    - Deployment: architecture/deployment.md
     - Protocol: architecture/protocol.md
     - Simulation: architecture/simulation.md
     - Brain: architecture/brain.md
+    - MCP & tools: architecture/mcp.md
     - Voice: architecture/voice.md
     - Firmware: architecture/firmware.md
+    - Terminal body (TUI): architecture/tui.md
     - Integrations: architecture/integrations.md
     - Hardware: architecture/hardware.md
     - Roaming (v2): architecture/roaming.md

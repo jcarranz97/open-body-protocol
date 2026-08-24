@@ -1,14 +1,19 @@
 # TAMALAB Documentation
 
-**TAMALAB** is a physical desk pet whose brain lives in a homelab. An
-ESP32-S3 with a small screen renders a face, reads buttons and a
-push-to-talk microphone, and chirps. Everything that decides *who the pet
-is* — its stats, its memory, its personality, its opinions about your
-failing backups — runs in a container on the LAN, and is reachable from
-both the device and Telegram.
+**TAMALAB** is a desk pet whose brain runs in a container. Everything that
+decides *who the pet is* — its stats, its memory, its personality, its
+opinions about your failing backups — lives there: **one container, one
+volume, on whatever machine you have.** A laptop, a spare mini PC, a
+Raspberry Pi, or a homelab cluster if you happen to run one
+([deployment](architecture/deployment.md)). What you see is a **body**, and
+there are three of them: an ESP32-S3 with a
+screen, buttons and a push-to-talk microphone; a Telegram bot; and a
+terminal application built with Rich.
 
 It is a Tamagotchi in the shape it always should have had: the toy is the
-face, not the computer.
+face, not the computer. That is also why **the hardware is optional** — a
+pet with no ESP32 is not a degraded pet, it is the same creature with one
+fewer body ([terminal](architecture/tui.md)).
 
 !!! info "Phase 0 — design only"
     This repository contains documentation and no code. There is no
@@ -21,13 +26,15 @@ face, not the computer.
 
 ```mermaid
 flowchart TB
-    subgraph Body["ESP32-S3 — the body"]
+    subgraph Body["ESP32-S3 — a body"]
         UI["display · buttons · buzzer"]
         AUD["I2S mic + speaker"]
         NVS[("NVS cache<br/>last state")]
     end
 
-    subgraph Daemon["pet-daemon — homelab pod"]
+    TUI["Terminal body<br/>Python + Rich"]
+
+    subgraph Daemon["pet-daemon — one container, anywhere"]
         SIM["sim tick<br/>cron 60 s"]
         DB[("SQLite<br/>state · events · memory")]
         BRAIN["brain<br/>pluggable"]
@@ -42,6 +49,7 @@ flowchart TB
 
     UI -- "MQTT: event" --> Daemon
     Daemon -- "MQTT: state, say, cmd" --> UI
+    TUI <-- "MQTT — same contract" --> Daemon
     AUD <-- "WSS: PCM in / PCM out" --> VOICE
     Daemon -. "retained state" .-> NVS
 
@@ -90,8 +98,9 @@ keeps animating until it comes home.
 | A face that reacts, buttons, a buzzer | On-device LLM inference |
 | Persistent state that survives reflashing | Battery, portability, roaming |
 | Telegram as a second face for the same pet | BLE, cellular, WireGuard |
+| A terminal body, so hardware is optional | A desktop GUI application |
 | Push-to-talk voice (last feature built) | Wake words, always-on listening |
-| Reactions to real homelab events | Multi-user, multi-pet |
+| Reactions to real events from the things you run | Multi-user, multi-pet |
 
 Voice is a v1 feature but the *last* one built, and it forces the board
 choice up front: buy the ESP32-S3 with PSRAM in Phase 1 even though nothing
@@ -105,13 +114,14 @@ keep that door open, which are cheap now and expensive to retrofit.
 
 | Component | Choice | Why |
 |---|---|---|
-| Daemon | Python 3.13 + SQLite | One pod, one file, no server to operate |
+| Daemon | Python 3.13 + SQLite | One container, one file, no server to operate |
 | Control transport | MQTT (Mosquitto) | Retained state, LWT, pub/sub, tiny client |
 | Audio transport | WebSocket over TLS | MQTT is the wrong shape for streams |
 | Brain | Pluggable: canned / OpenAI-compatible / Anthropic | Local privacy or cloud quality, by config |
 | Voice | Pluggable: faster-whisper + Piper, or cloud | Local-only is a viable full config |
 | Firmware | ESP32-S3, FreeRTOS | PSRAM for audio, two cores, enough GPIO |
 | Second face | Telegram | Already exists, and the pet feels continuous |
+| Third face | Python + Rich TUI | A pet where the work happens; no hardware needed |
 | Documentation | MkDocs Material | Same as `piezario` and `printforhelp` |
 
 ## Where to start reading
@@ -120,6 +130,10 @@ keep that door open, which are cheap now and expensive to retrofit.
    system and why the split falls where it does.
 2. [Protocol](architecture/protocol.md) — MQTT topics and the JSON payloads.
    The contract everything else is written against.
-3. [Roadmap](roadmap.md) — five phases, each independently playable.
-4. [Open questions](open-questions.md) — what has to be decided before
+3. [Terminal body](architecture/tui.md) — the no-hardware path, and the
+   body contract any new face implements.
+4. [Deployment](architecture/deployment.md) — the container, what it needs
+   from a host, and why a homelab is optional.
+5. [Roadmap](roadmap.md) — six phases, each independently playable.
+6. [Open questions](open-questions.md) — what has to be decided before
    Phase 0, and what can wait.

@@ -32,6 +32,13 @@ device renders the correct face before it has asked anything, and
 are views onto it. When v2 adds a second body, both subscribe to the same
 state and the daemon tracks which is *active* for routing `say`.
 
+**Nothing in this contract is specific to hardware.** The terminal body
+([TUI](tui.md)) is an ordinary MQTT client with an id like `tui-thinkpad-jc`
+and a `caps` list that omits `buzzer`, `imu` and `speaker`. A second,
+independent implementation is the cheapest proof that the contract is
+complete: anything a body cannot do from `state` + `say` alone is a hole,
+and it is cheaper to find in Python than in C.
+
 ### Access control
 
 Per-device credentials, and a broker ACL that says what each may touch
@@ -58,7 +65,8 @@ key in v2.
 
 `caps` is what makes the registry useful: the daemon learns what this body
 can do rather than assuming. A keychain that reports no `speaker` never gets
-a `say` with `tts: true`.
+a `say` with `tts: true`, and neither does a terminal. Known capabilities:
+`display`, `buttons`, `text_input`, `buzzer`, `speaker`, `mic`, `imu`.
 
 ### `event` — device → server
 
@@ -155,7 +163,7 @@ reads as a malfunction rather than a personality (FR-032). A `say` whose
 { "v": 1, "op": "set_volume", "value": 60 }
 { "v": 1, "op": "reboot" }
 { "v": 1, "op": "sync" }
-{ "v": 1, "op": "ota", "url": "http://homelab.lan/fw/0.3.2.bin", "sha256": "..." }
+{ "v": 1, "op": "ota", "url": "http://fw.dev.lan/0.3.2.bin", "sha256": "..." }
 ```
 
 `sync` asks for a fresh state publish. `ota` carries a hash because the URL

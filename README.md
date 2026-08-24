@@ -1,13 +1,29 @@
 # TAMALAB
 
-**TAMALAB** is a physical desk pet — an ESP32 with a face — whose brain,
-memory and personality live in a container in a homelab. The device is a
-*body*, not a computer: it renders a face, reads buttons and a microphone,
-and caches the last known state so it keeps being charming when the network
-is not. Everything that decides *who the pet is* runs on the server, and is
-reachable from both the device and Telegram.
+**TAMALAB** is a desk pet whose brain, memory and personality live in a
+container — **one container and one volume, on whatever machine you have**: a
+laptop, a mini PC, a Raspberry Pi, or a homelab if you run one. What you look
+at is a **body**, and there are three, none of them primary:
 
-Three ideas hold it together:
+| Body | What it is |
+|---|---|
+| **Device** | An ESP32-S3 with a screen, buttons, a buzzer and push-to-talk voice |
+| **Terminal** | A Python + [Rich](https://rich.readthedocs.io/) TUI, for a pet in a pane next to your work |
+| **Telegram** | The same pet, as text, on your phone |
+
+**The hardware is optional, and so is the infrastructure.** A pet with no
+ESP32 is not a lesser pet, just one with fewer bodies — and the smallest
+install is not a container at all:
+
+```bash
+uvx tamalab tui --solo     # a whole pet: no container, no broker, no keys
+docker compose up -d       # the normal install: daemon + broker, one volume
+```
+
+See [deployment](docs/architecture/deployment.md) for what a host actually
+needs (spoiler: one core, 256 MB, no inbound ports).
+
+Four ideas hold it together:
 
 - **The daemon owns the truth.** The ESP32 holds a cached copy only. Reflash
   it, unplug it, replace it — the pet is unaffected.
@@ -17,6 +33,9 @@ Three ideas hold it together:
 - **The brain is a config value.** Local (Qwen via Ollama), cloud (Claude, or
   anything OpenAI-compatible), or none at all — behind one narrow interface,
   with a canned-line table as the permanent last fallback.
+- **Bodies are clients of one protocol.** Same events, same ULIDs, same
+  TTLs, whether the face is drawn in flash or in characters. A fourth body —
+  a web dashboard, an e-ink frame — needs no change in the daemon.
 
 > **Status: Phase 0 — design only.** This repository currently contains
 > documentation and no code. The architecture is being written first,
@@ -52,6 +71,7 @@ uses the same `uvx` invocation.
 | [Requirements](docs/requirements.md) | Numbered `FR`/`NFR` requirements the architecture cites |
 | [Open Questions](docs/open-questions.md) | Decisions to make before Phase 0 |
 | [Architecture](docs/architecture/overview.md) | Protocol, simulation, brain, voice, firmware, hardware |
+| [Terminal body](docs/architecture/tui.md) | The no-hardware path, and the contract any new body implements |
 | [Original Brief](docs/brief.md) | The seed document, kept verbatim |
 
 ## Planned layout
@@ -60,7 +80,10 @@ Nothing below exists yet. It is here so the docs can refer to it.
 
 ```text
 daemon/      Python + SQLite. Owns state, runs the sim tick, hosts the brain,
-             the Telegram bot and the homelab webhook.
+             the Telegram bot and the event webhook.
+client/      The body half — transport, state cache, event queue, TTLs.
+             Importable by any body; the TUI is its reference consumer.
+tui/         The terminal body. Rich, plus a small raw-mode key reader.
 firmware/    ESP32-S3. Display, buttons, buzzer, I2S mic + speaker.
 docs/        These documents.
 ```
