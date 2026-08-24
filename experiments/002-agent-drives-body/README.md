@@ -455,11 +455,72 @@ server pinned to a dead node, the agent fell back to the shell, ran
 `sg`, and completed the blink. The two joins are not redundant — one
 diagnosed the other.
 
-**Still untested:** a genuine physical unplug with the server correctly
-configured — does `tools/list_changed` reach Claude Code and make the verbs
-vanish from its context mid-session?
+### Hot-plug ✅ 2026-08-24 — the last requirement
+
+With the server auto-discovering, the cable was pulled mid-session and put
+back. From `/tmp/obp-mcp.log`, timestamps as recorded:
+
+```text
+07:39:40  <--  call blink {"times": 2}
+07:39:41  -->  "blinked 2 times"
+
+          ... cable pulled ...
+
+07:39:58  <--  call blink {"times": 2}
+07:39:58  -->  notifications/tools/list_changed        ← host emits
+07:39:58  -->  isError=true "stopped responding and has been detached"
+07:39:58  <--  tools/list                              ← Claude Code re-lists
+07:39:58  -->  1 tool                                  ← only obp__status left
+
+          ... cable replaced ...
+
+07:40:27  <--  call obp__status {}
+07:40:27  -->  notifications/tools/list_changed        ← host emits
+07:40:27  -->  "attached: Raspberry Pi Pico body ... set_led, blink, ..."
+07:40:27  <--  tools/list                              ← re-lists again
+07:40:39  <--  call blink {"times": 2}
+07:40:39  -->  "blinked 2 times"
+```
+
+**Five tools → one → five, with Claude Code re-listing on both transitions.**
+M6 is confirmed against a real client, not merely declared.
+
+What the agent said, unprompted and correct: *"The body was detached and
+`obp__status` now reports no bodies attached, so its verbs are gone… that
+errno 5 on write usually means the USB serial device disappeared."* Then, on
+"try again", it called `obp__status` — which re-attached — and blinked. It
+recovered without being told how.
+
+Three of our fixes chained to make that possible: the failure became a result
+rather than a fault (H5a), presence loss withdrew the verbs (H5), and status
+retried the attach (M9).
+
+**One weakness the log exposed.** With nothing attached, status said *"No
+bodies attached and no errors recorded"* — true and useless. It now reports
+which USB serial devices are present and what to check, or says plainly that
+none are.
+
+### What Part D settled
+
+- **Claude Code speaks MCP revision `2025-11-25`**, handshake-based.
+- **`tools/list_changed` works** and is acted on immediately.
+- **Natural language reaches the right verb with the right arguments**, with
+  no `describe` step, because MCP puts the schemas in context.
+- **A body can leave and return mid-session** without restarting the agent.
 
 ### Which join felt better
+
+**Both, and not redundantly.** MCP is lower friction when it works — three
+sentences of plain English, no paths, no commands, and the schemas already in
+context so no `describe` step. But every failure in this experiment was
+diagnosed through the CLI: when the MCP server was pinned to a dead node, the
+agent fell back to the shell, ran `describe`, hit the `dialout` problem, read
+the host's own error text, wrapped the command in `sg`, and finished the job.
+
+The CLI has no configuration to be wrong, which is exactly why it survives
+the configuration being wrong. A host should offer both and say so.
+
+
 
 The point of running both. CLI or MCP — which needed less explaining, which
 made better verb choices, and which would you keep?

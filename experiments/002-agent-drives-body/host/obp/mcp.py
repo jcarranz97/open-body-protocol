@@ -102,7 +102,19 @@ class McpServer:
             lines.append("")
             lines += self.problems
         if not lines:
-            lines = ["No bodies attached and no errors recorded."]
+            # "nothing attached, no errors" is true and useless. Say what was
+            # looked for, so the answer is actionable.
+            from .ports import BY_ID, stable_ports
+            seen = stable_ports()
+            if seen:
+                lines = ["No bodies attached. USB serial devices present:"]
+                lines += [f"    {s}" for s in seen]
+                lines.append("None of them answered body/describe — check the "
+                             "firmware is running, and that this process can "
+                             "open the device.")
+            else:
+                lines = [f"No bodies attached, and no USB serial devices found "
+                         f"under {BY_ID}. Plug a body in and ask again."]
         return {"content": [{"type": "text", "text": "\n".join(lines)}],
                 "isError": bool(self.problems and not self.registry.bodies)}
 

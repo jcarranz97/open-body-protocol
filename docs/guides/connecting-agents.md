@@ -183,6 +183,22 @@ This is the path [desk-buddy](https://github.com/jcarranz97/desk-buddy)
 takes, because it wants identity, memory and behaviour on top of the verbs
 rather than a bare tool list.
 
+## Offer both
+
+MCP and the CLI are not alternatives to choose between. MCP is lower friction
+when it works: plain language reaches the right verb with the right
+arguments, and no discovery step is needed because the schemas are already in
+the caller's context.
+
+But a host's configuration can be wrong, and MCP is the part that breaks when
+it is. In [experiment 002](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/002-agent-drives-body)
+every MCP failure was diagnosed through the CLI — an agent fell back to the
+shell, read the host's own error text, worked around a permissions problem
+and completed the task. **The CLI has no configuration to be wrong, which is
+why it survives the configuration being wrong.**
+
+A host **SHOULD** provide both, and say so in its documentation.
+
 ## What this page is not
 
 - **Not a way for a body to reach an agent's tools.** A body cannot call the
