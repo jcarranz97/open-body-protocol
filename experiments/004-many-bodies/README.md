@@ -64,11 +64,72 @@ Three bindings in one list: a subprocess, a USB cable and a WiFi broker.
 
 ## Part C — an agent driving several bodies
 
-Point Claude Code or OpenCode at `host/obp_mcp.py` as in experiment 002, with
-more than one body attached, and ask it to do something involving a particular
-one. What is being tested is not the transport — 002 settled that — but
-whether an agent handed a dozen near-identical verbs picks the right body, and
-whether it recovers when one of them leaves mid-task.
+002 settled that an unmodified agent can drive one body. This asks what a model
+does with *several*: whether it picks the right one out of a dozen
+near-identical verbs, whether it treats a stated selection as a default or as a
+constraint, and whether it recovers when a body leaves mid-task.
+
+### Setting it up
+
+Start the broker (from experiment 003 — there is only one, and it binds 1883):
+
+```bash
+(cd ../003-mqtt-binding && docker compose up -d)
+```
+
+The subshell matters: the `claude mcp add` line below uses `$PWD`, so run both
+from this experiment's directory.
+
+Then register the server. One line, absolute path, so it works from whatever
+directory the agent happens to start in:
+
+```bash
+claude mcp add obp -- sg dialout -c "uv run --no-project \
+    --with paho-mqtt --with pyserial python3 \
+    $PWD/host/obp_mcp.py --mqtt --lights --log /tmp/obp-mcp.log"
+```
+
+For OpenCode, the same command goes in `opencode.jsonc` as in experiment 002.
+
+Three things about that line are deliberate:
+
+- **`sg dialout -c`** runs it with the serial group. `newgrp` starts an
+  interactive shell and hangs a non-interactive caller, which cost experiment
+  002 an afternoon.
+- **`--no-project`** stops `uv` looking for a project in whatever directory the
+  agent inherited.
+- **No `--port`.** The default is `auto`, and bodies are re-attached on every
+  `obp__status`, so a board that re-enumerates or arrives late is picked up
+  without touching the config. Experiment 002 pinned `/dev/ttyACM0` here and
+  broke the moment the board moved to `ttyACM1`.
+
+Add `--fake-id arm --fake-id drone` to run the whole thing with no hardware at
+all.
+
+Start a fresh session and expect ten tools: four on `pico-3f5022` (USB), two on
+`picow-7c6e37` (WiFi), two on `house-lights`, plus `obp__status` and
+`obp__use`.
+
+### What to ask, and what to watch for
+
+Roughly in order of how likely each is to go wrong. The interesting part is not
+whether the call succeeds — the host has its own tests for that — but what the
+model *chooses*.
+
+| # | Ask | What is being tested |
+|---|---|---|
+| 1 | "What bodies do you have?" | Does it call `obp__status`, or infer a roster from tool names and get it subtly wrong? |
+| 2 | "I'm working on the Pico on USB. Blink it 3 times." | Does it reach for `obp__use`, or ignore the selection mechanism and call the namespaced verb directly? **Both are correct** — the question is which it prefers. |
+| 3 | **"Now turn on the lights in room1."** | **The one this feature exists for.** With the arm selected it must still call `house-lights__set_room_lights`. A model that reads a stated selection as a *constraint* rather than a default will refuse, or ask permission it does not need. |
+| 4 | "Turn on all the lights." | The body answers `6 lights on in all; 2 unreachable: counter_2, hall_2`. Does the model pass the failure on, or flatten it to "done"? |
+| 5 | "Set the brightness to 20." *(with the Pico W selected)* | The Pico W cannot dim. The host refuses and names `pico-3f5022`. Does the model relay that, ask, or **silently retarget a physical action** — which is the failure mode every disambiguation study warns about? |
+| 6 | Unplug the USB Pico, then "blink the arm". | H6: a readable result, not a stall. Does it recover by calling `obp__status`, or keep calling a verb into a void? |
+| 7 | Plug it back in, then "blink it again". | M6: verbs return with no restart. Does the model retry, or has it concluded the body is gone for good? |
+
+Worth recording either way: a model that never touches `obp__use` and simply
+names bodies explicitly has *also* answered the question — it means selection
+is a convenience for people rather than something an agent needs, which is
+worth knowing before any of it is proposed as a requirement.
 
 ## Part D — selecting a body
 
@@ -154,9 +215,22 @@ the transport object.
 
 ### Part C ⏳
 
+- Agent: `______` · bodies attached: `______`
+
+| # | Ask | Result |
+|---|---|---|
+| 1 | "What bodies do you have?" | ⬜ |
+| 2 | "I'm working on the Pico on USB. Blink it 3 times." | ⬜ |
+| 3 | "Now turn on the lights in room1." (arm still selected) | ⬜ |
+| 4 | "Turn on all the lights." | ⬜ |
+| 5 | "Set the brightness to 20." (Pico W selected) | ⬜ |
+| 6 | Unplug the USB Pico, then "blink the arm" | ⬜ |
+| 7 | Plug it back in, then "blink it again" | ⬜ |
+
 ```text
 
 ```
+
 
 ### Part D — selecting a body ✅ 2026-08-24
 
