@@ -18,15 +18,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from obp import (BodyClient, BodyError, BodyUnavailable, Registry,  # noqa: E402
-                 SerialTransport, SubprocessTransport)
+                 SerialTransport, SubprocessTransport, describe_spec, resolve)
 from obp.client import render_result  # noqa: E402
 from obp.naming import mcp_tool_name  # noqa: E402
 
 
 def attach(args) -> Registry:
     reg = Registry()
-    for port in args.port:
-        client = BodyClient(SerialTransport(port))
+    for spec in args.port:
+        path = resolve(spec)
+        if path is None:
+            raise SystemExit(describe_spec(spec))
+        client = BodyClient(SerialTransport(path))
         client.transport.open()
         reg.add(client)
     if args.fake or not args.port:
@@ -50,7 +53,9 @@ def parse_kv(pair: str) -> tuple[str, object]:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--port", action="append", default=[], help="serial device; repeatable")
+    p.add_argument("--port", action="append", default=[],
+                   help="device path, /dev/serial/by-id/... path, or a fragment "
+                        "of the board serial such as 3f5022; repeatable")
     p.add_argument("--fake", action="store_true", help="attach the hardware-free body")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("bodies", help="which bodies are present")

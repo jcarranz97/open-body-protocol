@@ -29,6 +29,17 @@ A binding **MUST** define detection for both directions. A binding that
 cannot detect loss **MUST** specify a `ping` interval, and the host **MUST**
 treat unanswered pings as loss.
 
+**Attachment is not presence.** A host that reports what it attached at
+startup, rather than what is reachable now, will confidently list a body that
+has been unplugged for an hour. A failed operation is therefore a presence
+signal in its own right: a host **MUST** treat an error talking to a body as
+loss of presence, not merely as a failed call.
+
+The reference host learned this the hard way. A Raspberry Pi Pico
+re-enumerated from `/dev/ttyACM0` to `/dev/ttyACM1` mid-session; every write
+then failed, and the host's status verb went on reporting the body as
+attached with all four verbs available.
+
 ## Announced, not polled
 
 A body **SHOULD** announce itself on connect
@@ -39,6 +50,18 @@ A host **MUST NOT** rely on the announcement alone. A body on a cable may
 have been running for hours before the host started, and will never send
 another. Every binding therefore also supports discovery by asking — opening
 the port and calling `body/describe`, or reading the retained set.
+
+## Device paths are not identities
+
+On Linux a USB serial device is `/dev/ttyACM0` until something re-enumerates
+it and it becomes `/dev/ttyACM1`. A host holding the old path writes into a
+node that no longer exists.
+
+A host **SHOULD** therefore address a serial body by something stable — on
+Linux, the `/dev/serial/by-id/` symlink, which is keyed on the USB serial
+number — and **SHOULD** re-resolve it when reattaching. For boards whose OBP
+`id` derives from the same hardware serial, the two identities coincide, and
+`pico-3f5022` is findable without configuration.
 
 ## Flapping
 

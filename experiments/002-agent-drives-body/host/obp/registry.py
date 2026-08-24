@@ -114,9 +114,33 @@ class Registry:
             return _error(f"'{verb}' is marked userOnly and may not be invoked autonomously")
         try:
             return entry.client.call(verb, arguments)
-        except BodyError as exc:
+        except Exception as exc:
+            # Deliberately broad. Anything that goes wrong talking to a body
+            # is a *presence* signal, and the caller must receive a result it
+            # can read rather than a transport fault. A serial write to a
+            # re-enumerated device raises OSError, not BodyError, and letting
+            # that escape produced a JSON-RPC -32603 in experiment 002.
             self.remove(entry.info.id)
-            return _error(f"the body '{entry.info.name}' is not responding: {exc}")
+            return _error(
+                f"the body '{entry.info.name}' stopped responding and has been "
+                f"detached ({type(exc).__name__}: {exc}). Its verbs are no longer "
+                f"available; ask for status to look for it again.")
+
+    def verify(self) -> list[str]:
+        """Ping every body and drop the ones that do not answer.
+
+        Attachment is not presence. A host that reports its attach-time
+        inventory while every write fails is lying, which is what experiment
+        002 caught obp__status doing.
+        """
+        gone = []
+        for body_id, entry in list(self._bodies.items()):
+            try:
+                entry.client._request("ping")
+            except Exception:
+                gone.append(f"{entry.info.name} [{body_id}] stopped responding")
+                self.remove(body_id)
+        return gone
 
 
 def _error(text: str) -> dict[str, Any]:

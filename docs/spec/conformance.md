@@ -67,6 +67,8 @@ requirement here is one somebody would otherwise get wrong.
 | H4 | **MUST** withhold `userOnly` verbs from autonomous callers. |
 | H4a | **MUST NOT** make a `userOnly` verb unreachable altogether; a human interface **MAY** invoke it. |
 | H5 | **MUST** withdraw a body's verbs when presence is lost. |
+| H5a | **MUST** treat an error talking to a body as loss of presence, and **MUST NOT** report attach-time inventory as current presence. |
+| H5b | **SHOULD** address a serial body by a stable identifier rather than a numbered device node, and re-resolve it when reattaching. |
 | H6 | **MUST** synthesise an `isError` result — never hang — for a call to a body that has gone. |
 | H7 | **MUST** apply a timeout to every call and surface expiry as a result. |
 | H8 | **MUST** re-read `body/describe` after a reconnect, and **MUST NOT** reuse a cached description. |

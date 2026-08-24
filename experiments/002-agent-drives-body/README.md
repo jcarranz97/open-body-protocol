@@ -22,6 +22,7 @@ cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
 python3 tests/test_naming.py       # MCP-safe tool names (M1–M3)
 python3 tests/test_mcp_server.py   # the whole MCP mapping, over a pipe
 python3 tests/test_useronly.py     # userOnly is about who is asking
+python3 tests/test_departure.py    # a body that leaves is a result, not a fault
 ```
 
 The second one speaks MCP to the server exactly as an agent would, and
@@ -358,12 +359,72 @@ status: attached: Raspberry Pi Pico body (pico-sdk) [pico-3f5022]
         — set_led, blink, set_brightness, move
 ```
 
-### Part D — with an agent ⏳
+### Part D — with an agent ✅ 2026-08-24
 
-_Re-run after logging out and back in, or with the `sg` wrapper above. What
-remains: which MCP revision Claude Code negotiates (`/tmp/obp-mcp.log` will
-say), whether unplugging the body withdraws its tools mid-session, and how
-the same two prompts feel compared with the CLI._
+Claude Code v2.1.241, registered with the `sg` wrapper. Three requests in
+plain English, three correct calls, no `describe` step — MCP had already put
+the schemas in context.
+
+```text
+"can you please blink the led of my robot 5 times?"
+    → pico-3f5022__blink {"times": 5}
+
+"blink it 5 times but with a 500ms interval"
+    → pico-3f5022__blink {"times": 5, "interval_ms": 500}
+
+"put the led to 25 %"
+    → pico-3f5022__set_brightness {"level": 25}
+```
+
+**The dialect, from `/tmp/obp-mcp.log`:** Claude Code negotiated MCP revision
+**`2025-11-25`** — handshake-based, not the stateless 2026-07-28 — and
+advertised `roots.listChanged` and `elicitation` as client capabilities. The
+server echoed the requested revision back, which is why the connection
+worked without either side special-casing the other.
+
+### The disconnect test 🐛 — three more bugs
+
+Unplugging the Pico mid-session was meant to test hot-plug. It found
+something worse, and the agent's own diagnosis is worth quoting:
+
+> *`obp__status` still reports the Pico as attached with all four verbs, so
+> the host thinks the body is fine while the serial write is actually
+> failing.*
+
+The board had **re-enumerated** from `/dev/ttyACM0` to `/dev/ttyACM1`. Not a
+disconnection at all — the host was writing into a device node that no longer
+existed.
+
+| Bug | Fix |
+|---|---|
+| A dead body's failure escaped as JSON-RPC `-32603`, violating "errors are results" | `Registry.call` catches everything, detaches the body, and returns a readable `isError` result |
+| `obp__status` reported attach-time inventory as if it were presence | `Registry.verify()` pings each body first and drops the ones that do not answer |
+| A numbered device node was treated as an identity | Ports resolve through `/dev/serial/by-id/`, and re-resolve on every reattach |
+
+The third fix is the one worth keeping. A Pico's by-id symlink is
+`usb-Raspberry_Pi_Pico_E6611C08CB3F5022-if00`, and our firmware derives its
+OBP `id` from the last bytes of that same serial — so `pico-3f5022` and the
+OS-level device identity are the same fact seen from two directions:
+
+```bash
+python3 host/obp_cli.py --port 3f5022 bodies      # finds it wherever it landed
+```
+
+A stale path now explains itself rather than failing obscurely:
+
+```text
+/dev/ttyACM0: not present. Attached USB serial devices:
+    /dev/serial/by-id/usb-Raspberry_Pi_Pico_E6611C08CB3F5022-if00
+```
+
+Generalised into the specification as **H5a** (an error talking to a body is
+loss of presence; never report attach-time inventory as current presence) and
+**H5b** (address a serial body by a stable identifier, and re-resolve on
+reattach). `tests/test_departure.py` pins both.
+
+**Still untested:** a genuine physical unplug, now that the re-enumeration
+case is out of the way — does `tools/list_changed` reach Claude Code and make
+the verbs vanish from its context mid-session?
 
 ### Which join felt better
 

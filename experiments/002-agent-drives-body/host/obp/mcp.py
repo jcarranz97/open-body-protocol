@@ -87,8 +87,13 @@ class McpServer:
                                 key=lambda t: t["name"])}
 
     def _status(self) -> dict[str, Any]:
+        # Liveness first: a body that has silently gone must not be reported
+        # as attached, and dropping it withdraws its verbs (M6).
+        departed = self.registry.verify()
         if self.attach is not None:
             self.problems = self.attach()      # retry; a fixed problem clears
+        for note in departed:
+            self.problems.insert(0, note)
         lines = []
         for info in self.registry.bodies:
             verbs = ", ".join(t.name for t in info.tools if not t.user_only)
