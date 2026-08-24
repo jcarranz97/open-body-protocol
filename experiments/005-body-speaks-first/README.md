@@ -134,6 +134,43 @@ session, and that is the shape a real answer takes.
 
 The four suites inherited from 004 still pass unchanged.
 
+### Offline catch-up ✅ 2026-08-24
+
+The autonomous-body case: a robot with its own long-lived agent, nobody
+typing, and a press that happens while the brain is restarting.
+
+```text
+a host with a persistent session leaves
+the body reports two presses while nobody is connected
+the host comes back with the same client id
+  ok:   the broker resumed the session it was holding
+  ok:   both presses were delivered on reconnect (2)
+  ok:   with their payloads intact: [80, 300]
+a host that asks for no session gets no backlog
+  ok:   and the press that happened while it was away is gone — which is the
+        behaviour every OBP host had until now
+```
+
+Nothing was invented. MQTT has had persistent sessions for twenty-five years:
+`Clean Start = 0` plus a `Session Expiry Interval`, and the broker holds the
+subscription and queues QoS 1 messages for a client that is not connected. The
+binding was one CONNECT flag away.
+
+Three things must be right together, and any one wrong makes it silently do
+nothing: **a stable client id** (the session is keyed on it, so a randomised
+one per start looks like a new client every time — the usual reason people
+conclude this does not work), **QoS 1 at both ends** (QoS 0 has no ack, so
+there is nothing to queue), and **a subscription made before leaving** (the
+broker queues against a subscription, not a topic).
+
+The control case is the part worth keeping: with `session_expiry=0` the press
+is simply gone, which is what every OBP host did until now.
+
+Writing the test taught the same lesson twice. The first version left a
+subscribed session behind — a session outliving its process being the whole
+point — which then collected the event the *next* section published and
+delivered it on the following run, failing a test whose code had not changed.
+
 ### Part B — a real button ⏳
 
 ```text
