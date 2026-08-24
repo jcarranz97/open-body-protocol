@@ -323,3 +323,30 @@ what forces the "one session owns the bot" shape in Claude Code's plugin, in
 Goose's gateway and in most community bridges. Webhooks appear only where a
 hosted relay or a suspendable cloud machine already exists — which is the same
 NAT story the transport research told.
+
+### Where OBP sits, given what is already standardising
+
+One finding from the survey is worth stating on its own, because it bears on
+scope rather than on any particular feature.
+
+**Something is already standardising the brain side.** ACP — `session/new`,
+`session/prompt`, `session/update`, `session/request_permission`, over JSON-RPC
+— has 39 agents in its registry, including Claude, Codex, Gemini CLI, Cursor,
+Copilot, Goose and OpenCode. Goose *is* an ACP server. That is the "connect any
+brain" half of this project's ambition, being built by other people, and
+converging.
+
+It suggests a cleaner division than the one we had been assuming. ACP is how
+you talk to any brain; OBP is how you talk to any body. They are complementary
+halves rather than competitors, and the useful consequence is that **OBP should
+stay narrow**. Every brain-side feature this protocol grows is one that
+duplicates work already happening elsewhere, on a surface OBP does not control.
+
+The inbound half is the part nobody has standardised. MCP has no primitive for
+a server to push an unsolicited turn — Anthropic filled that gap with a
+proprietary `experimental` capability rather than an MCP feature, and a channel
+event ends up **on the same prompt queue as human input**, tagged as meta and
+attributed to the channel. So a body's press does not interrupt a model; it
+arrives the way a person typing would. That is the same "durably write it where
+the next turn reads it" shape as everything else in this section, applied one
+layer further in.
