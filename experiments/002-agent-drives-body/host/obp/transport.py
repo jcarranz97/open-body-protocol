@@ -74,6 +74,50 @@ class SubprocessTransport:
         return self.proc is not None and self.proc.poll() is None
 
 
+def _explain_open_failure(port: str, exc: Exception) -> str:
+    """Turn an unhelpful OS error into the thing the caller has to do.
+
+    A permission failure on a tty is the first obstacle between a person and
+    a working body, and the message the OS gives mentions neither groups nor
+    the fix. Both runs of experiment 002 lost time here.
+    """
+    import errno
+    import grp
+    import os
+
+    if getattr(exc, "errno", None) != errno.EACCES:
+        return f"could not open {port}: {exc}"
+
+    try:
+        owner_group = grp.getgrgid(os.stat(port).st_gid).gr_name
+    except (OSError, KeyError):
+        owner_group = "dialout"
+
+    in_process = owner_group in (grp.getgrgid(g).gr_name for g in os.getgroups())
+    lines = [f"Permission denied opening {port}.", ""]
+
+    if in_process:
+        lines += [f"This process is in '{owner_group}', so the cause is something else —",
+                  "another program may be holding the port (ModemManager is a common one)."]
+    else:
+        lines += [
+            f"{port} is owned by group '{owner_group}' and this process is not in it.",
+            "",
+            f"  sudo usermod -aG {owner_group} $USER      # once, permanently",
+            "",
+            "That does NOT affect a shell that is already open: supplementary",
+            "groups are fixed at login. Until you log out and back in, use:",
+            "",
+            f"  sg {owner_group} -c '<command>'           # one command, non-interactive",
+            f"  newgrp {owner_group}                      # a new interactive shell",
+            "",
+            "Scripts and agents want 'sg': 'newgrp' starts an interactive shell",
+            "and waits for input, so a non-interactive caller hangs or loses the",
+            "command.",
+        ]
+    return "\n".join(lines)
+
+
 class SerialTransport:
     """Talk to a body over USB CDC serial (the Raspberry Pi Pico case)."""
 
@@ -90,7 +134,10 @@ class SerialTransport:
                 "pyserial is required for --port. Try:\n"
                 "  uv run --with pyserial python host/cli.py ..."
             ) from exc
-        self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
+        try:
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
+        except serial.SerialException as exc:
+            raise SystemExit(_explain_open_failure(self.port, exc)) from exc
         # A Pico that was already running has buffered output; drop it so the
         # first response we parse is genuinely ours.
         time.sleep(0.2)

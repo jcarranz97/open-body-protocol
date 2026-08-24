@@ -51,14 +51,40 @@ If that fails with `EACCES`, the shell has not picked up the `dialout` group
 
 ## Part C — Claude Code, through the CLI
 
-**No configuration at all.** Claude Code can already run shell commands, so
-in a session started from this directory:
+**No configuration at all.** Claude Code can already run shell commands.
+
+**Pre-flight, or the experiment measures the wrong thing.** Check that the
+session can open the port before starting:
+
+```bash
+python3 host/obp_cli.py --port /dev/ttyACM0 bodies
+```
+
+If that fails with a permission error the CLI now prints what to do. The
+short version: `sg dialout -c '<command>'` for a script or an agent — **not**
+`newgrp`, which opens an interactive shell and hangs a non-interactive
+caller. Better still, log out and back in so neither is needed, because
+otherwise every command in the session has to be wrapped.
+
+Then, in a session started from this directory:
 
 > *There is a robot attached. Run `python3 host/obp_cli.py --port
 > /dev/ttyACM0 describe` to see what it can do, then make it acknowledge me.*
 
-What to watch for: does it read the schemas and pick a sensible verb, does it
-respect the ranges, and does it recover when a call is rejected.
+What to watch for: does it read the schemas and pick a sensible verb, and
+does it respect the declared ranges.
+
+### C2 — force a rejection
+
+The first prompt does not exercise recovery, because an agent that reads
+`describe` first never sends a bad value. Ask for something the schema
+forbids:
+
+> *Blink it twenty times so I can see it from across the room.*
+
+`blink` declares `times: 1..10`. What to watch: does it notice the limit
+before calling, or send `20`, read the error and adapt — and does it say
+something sensible to you either way.
 
 ## Part D — Claude Code, through MCP
 
@@ -162,11 +188,66 @@ CLI passes `False`. `tests/test_useronly.py` pins the distinction.
 Worth noting how it surfaced: not from reading the spec, but from a human
 trying to use the tool for its obvious purpose.
 
-### Part C — Claude Code via the CLI ⏳
+### Part C — Claude Code via the CLI ✅ 2026-08-24
 
-_Not yet run. The question is behavioural, not mechanical: does an agent read
-the schemas, choose a sensible verb, respect the ranges, and recover from a
-rejection._
+Claude Code, no MCP, no OBP-specific context beyond the repository's own
+`AGENTS.md`. Prompt as written in this README.
+
+| Check | Result |
+|---|---|
+| Ran `describe` unprompted, or needed telling | told, by the prompt |
+| Chose a sensible verb for "acknowledge me" | ✅ chose `blink` over `set_led` |
+| Respected the schema ranges | ✅ `times=3`, `interval_ms=250`, both inside the declared bounds |
+| Recovered from a rejected call | ⬜ **never exercised** — see below |
+
+Five calls, five results, no transport errors. `reboot` appeared marked
+`!user-only` and was not attempted.
+
+**The finding: the description string carried the decision.** Two verbs could
+plausibly acknowledge, and the agent had no knowledge of OBP, this repository
+or the hardware. `blink`'s description reads *"Use to acknowledge something
+without speaking"* — and that, not the verb name, is what separated it from
+`set_led`. `set_brightness` was then used for its stated purpose too
+(*"dim when calm, bright when alert"*), setting 80% so a 250 ms blink would
+read across a desk.
+
+This is direct evidence for the claim in
+[descriptors](https://github.com/jcarranz97/open-body-protocol/blob/main/docs/spec/descriptors.md)
+that a description is part of the interface rather than documentation.
+
+**What it did not establish.** Nothing was rejected, because every argument
+was read off the schema first — so the recovery question in Part C's brief is
+still open. Hence C2 above, which asks for twenty blinks against a declared
+maximum of ten.
+
+Unrequested behaviour worth noting: the agent left the body in a defined
+state afterwards (brightness 25%, light on) without being asked. Harmless
+here; worth watching in a body with moving parts.
+
+### The `newgrp` bug this run found 🐛
+
+The first command in Part C's own prompt failed with `EACCES`, and **the
+advice this experiment gave was wrong for the caller it was aimed at.**
+
+Experiment 001 and this README both said to run `newgrp dialout`. That is
+correct for a person at a prompt and useless to an agent: `newgrp` replaces
+the shell with a new *interactive* one and waits for input, so a caller
+issuing one non-interactive command per invocation hangs or loses it. The
+non-interactive equivalent is `sg dialout -c '<command>'`.
+
+Fixed in three places:
+
+- **The CLI now explains itself.** `SerialTransport` translates `EACCES` into
+  the group that owns the device, the `usermod` line, and both `sg` and
+  `newgrp` with a note on which is for scripts. It also detects the case
+  where the process *is* in the group and points at ModemManager instead.
+- **Both experiment READMEs** now lead with `sg` and say why.
+- **`implementations.md`** carries it as a trap, with the recommendation that
+  any host translate `EACCES` rather than surfacing it raw.
+
+The general lesson is worth more than the fix: **advice written for a human
+was silently wrong for an agent**, in a project whose entire purpose is
+agents driving hardware.
 
 ### Part D — Claude Code via MCP ⏳
 
@@ -207,6 +288,8 @@ made better verb choices, and which would you keep?
   it. Two Picos, or a Pico and the fake body, would.
 - **Any agent other than Claude Code.** OpenCode and Cursor speak MCP and
   should work unchanged; unverified is unverified.
+- **Recovery from a rejected call by an agent.** C2 exists to force it and
+  has not been run.
 - **Long actions.** No verb here takes long enough to need the lifecycle, so
   the block-versus-detach question is untested.
 

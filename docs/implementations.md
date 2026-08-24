@@ -81,7 +81,11 @@ its own path.**
 - Disable stdio CR translation, or framing becomes `\r\n`.
 - On MicroPython the REPL shares the USB port; replug after flashing.
 - On Linux the device is `root:dialout`, and `usermod -aG dialout` does **not**
-  apply to a shell that is already open.
+  apply to a shell that is already open. Use `sg dialout -c '<command>'` — not
+  `newgrp`, which starts an *interactive* shell and therefore hangs a script
+  or an agent. A host **should** translate `EACCES` on a tty into this
+  advice; it is the first obstacle between a builder and a working body, and
+  the error the OS gives mentions neither groups nor the fix.
 
 ## Listing yours
 

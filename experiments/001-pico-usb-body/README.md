@@ -167,12 +167,17 @@ sudo usermod -aG dialout $USER
 **This does not take effect in a shell that is already open.** Supplementary
 groups are fixed at login, so the running shell — and everything it spawns,
 including `uv run` — keeps the old set. Either log out and back in, or apply
-it to the current shell:
+it without one:
 
 ```bash
-newgrp dialout                  # affects this shell onward
-sg dialout -c '<command>'       # or apply it to one command
+sg dialout -c '<command>'       # one command, non-interactive
+newgrp dialout                  # a new interactive shell, for a person
 ```
+
+**Scripts and agents want `sg`.** `newgrp` replaces the shell with a new
+*interactive* one and waits for input, so a caller issuing one
+non-interactive command per invocation hangs or loses the command. This cost
+a Part C run of [experiment 002](../002-agent-drives-body/) ten minutes.
 
 Check with `id -nG` (the running process) against `id -nG $USER` (the user
 database). If `dialout` appears in the second and not the first, that is

@@ -61,6 +61,13 @@ whether this verb is the one it wants. *"Use for mood: dim when calm, bright
 when alert"* does more work than the schema does, and a body that ships
 `"description": "sets brightness"` has under-specified itself.
 
+This is observed, not assumed. Asked to make a body "acknowledge me", an
+agent with no knowledge of OBP or of the hardware chose `blink` over
+`set_led` — and the deciding factor was the description string, which reads
+*"Use to acknowledge something without speaking."* The verb names alone
+would not have separated them
+([experiment 002](../implementations.md#reference-bodies)).
+
 ## The restricted schema subset
 
 A body's `inputSchema` **SHOULD** use only:
