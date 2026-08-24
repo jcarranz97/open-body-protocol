@@ -33,6 +33,9 @@ class Registry:
     def __init__(self, on_change: Callable[[], None] | None = None) -> None:
         self._bodies: dict[str, Entry] = {}
         self._on_change = on_change
+        #: The body an unqualified instruction means. Host-side state, never
+        #: sent to a body and never a filter -- see select().
+        self._selected: str | None = None
 
     # ---------------------------------------------------------- lifecycle
 
@@ -114,6 +117,103 @@ class Registry:
                     "inputSchema": tool.input_schema,
                 })
         return sorted(out, key=lambda t: t["name"])
+
+    # --------------------------------------------------------- selection
+
+    def select(self, body_id: str | None) -> str | None:
+        """Point unqualified instructions at one body. Returns the selection.
+
+        Selection is **host-side state and nothing else**. It does not filter
+        `tools()`, does not rename a verb, and is never sent to a body. Three
+        separate reasons, and any one of them is sufficient:
+
+        * MCP 2026-07-28 (SEP-2567) requires that `tools/list` not depend on
+          per-connection or prior-call state, so a list that changed with a
+          selection would not be conformant.
+        * Tool definitions sit at the very front of a model's cache prefix,
+          so swapping them invalidates the tools block, the system prompt and
+          the whole conversation. Selecting a body five times costs more than
+          showing every body's verbs all session.
+        * A filtered list makes the interesting case impossible. With the arm
+          selected, "turn on the lights in room1" must still work -- and it
+          only can if the lights body's verbs were never taken away.
+
+        What selection buys is a *default*, so a person can say "blink" and
+        mean the thing in front of them.
+
+        An id that is not present is still accepted. Bodies flap, presence
+        debouncing exists for that reason, and forgetting the selection
+        because a cable was nudged is worse than holding a stale one -- which
+        `selection_note()` reports honestly.
+        """
+        self._selected = body_id
+        return self._selected
+
+    @property
+    def selected(self) -> str | None:
+        return self._selected
+
+    def selected_present(self) -> bool:
+        return self._selected is not None and self._selected in self._bodies
+
+    def selection_note(self) -> str:
+        if self._selected is None:
+            return "no body is selected; name one explicitly or select it"
+        entry = self._bodies.get(self._selected)
+        if entry is None:
+            return (f"selected: {self._selected} -- NOT present right now, so "
+                    f"unqualified instructions cannot be carried out")
+        return f"selected: {entry.info.name} [{self._selected}]"
+
+    def offers(self, verb: str) -> list[str]:
+        """Which present bodies advertise this bare verb name."""
+        return [e.info.id for e in self._bodies.values() if e.info.tool(verb)]
+
+    def resolve(self, verb: str, body_id: str | None = None) -> tuple[str | None, str]:
+        """Pick the body for a bare verb: explicit, else selected, else fail.
+
+        Returns `(body_id, note)`. `body_id` is None when the caller must be
+        told something instead -- and the note names the bodies that *do*
+        offer the verb, because "no" is much more useful with "but these can"
+        attached to it. Anthropic's tool guidance and every disambiguation
+        study say the same thing: an error that names the alternative costs
+        one round trip, where a silent refusal costs the task.
+
+        This never retargets a physical action on its own. `move` on a drone
+        and `move` on an arm are the same word and very different outcomes,
+        so a body that cannot do the thing is reported, not swapped.
+        """
+        candidates = self.offers(verb)
+        if body_id is not None:
+            if body_id not in self._bodies:
+                return None, f"'{body_id}' is not present"
+            if body_id not in candidates:
+                alt = ", ".join(candidates) if candidates else "no present body"
+                return None, f"'{body_id}' does not offer '{verb}'; {alt} does"
+            return body_id, ""
+
+        if self._selected is not None and self._selected in candidates:
+            # Say that the selection was what decided this. kubectl gets this
+            # backwards -- its scope warning fires only when you typed
+            # --namespace, so the implicit case, the one that needs telling,
+            # is the silent one. An explicitly named body needs no note; an
+            # implicitly chosen one does.
+            return self._selected, f"used the selected body '{self._selected}'"
+
+        if not candidates:
+            return None, f"no present body offers '{verb}'"
+
+        if self._selected is None:
+            if len(candidates) == 1:
+                return candidates[0], f"no body selected; used {candidates[0]}"
+            return None, (f"no body is selected and {len(candidates)} bodies offer "
+                          f"'{verb}': {', '.join(candidates)}. Select one, or name it.")
+
+        # Selected, but it cannot do this. Say so, and say who can.
+        return None, (f"the selected body '{self._selected}' does not offer "
+                      f"'{verb}'. {', '.join(candidates)} "
+                      f"{'does' if len(candidates) == 1 else 'do'}. "
+                      f"Name it explicitly, or select it.")
 
     def find(self, tool_name: str) -> tuple[Entry, str] | None:
         for entry in self._bodies.values():

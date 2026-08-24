@@ -66,3 +66,51 @@ which closes the window to nothing. The open part is what a host should do
 about the involuntary case: whether the specification should recommend a
 timeout, require hosts to treat a failed call as evidence of absence, or leave
 it to each binding.
+
+## Whether selecting a body belongs in the specification at all
+
+A person driving several bodies wants one of them in focus — *"I am operating
+the arm"* — so an unqualified instruction means that body. [Experiment
+004](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/004-many-bodies)
+implements this and deliberately does **not** add a requirement for it.
+
+It is host-side by the test this specification already applies: it constrains
+nobody implementing a body. A drone does not need to know it has been
+deselected, any more than it needs to know a verb was marked `userOnly`. Making
+it protocol would mean every body implementing a concept only the host uses.
+
+What the experiment settled, and what a host doing this should probably be held
+to, is that **selection must not filter the tool list**:
+
+- MCP's 2026-07-28 revision (SEP-2567) requires that `tools/list` not depend on
+  per-connection or prior-tool-call state.
+- Tool definitions sit at the front of a model's cache prefix, so replacing
+  them discards the system prompt and the whole conversation with them.
+- A filtered list makes the motivating case impossible: with the arm selected,
+  "turn on the lights in room1" must still work.
+
+Whether those become `H` requirements is the open part. Arguments against:
+`H2` and `H3` already forbid the mechanism a filtering host would need, so a
+new rule may be redundant; and a specification that starts describing host
+convenience features grows without limit. Arguments for: two hosts that
+disagree about what an unqualified verb means are not interchangeable, and
+`connecting-agents.md` already says *"two hosts must expose the same body
+identically, or an agent configuration stops being portable."*
+
+Three sub-questions the experiment answered by choosing, none of which is
+obviously right:
+
+- **A failed selection clears** (IMAP: *"no mailbox is selected"*) rather than
+  leaving the previous one live (POSIX `chdir`). For physical bodies the IMAP
+  behaviour looks clearly safer, but it means a typo silently costs you your
+  focus.
+- **A verb the selected body lacks is refused, naming the bodies that have
+  it** — never auto-retargeted. Defensible alternative: auto-redirect when
+  exactly one other body qualifies and the verb is read-only, which is what the
+  disambiguation literature suggests and what a smoother assistant would do.
+- **Selection is process-scoped** (`$OBP_BODY`, like `adb`'s
+  `$ANDROID_SERIAL`), not stored in a shared file — `kubectl`'s
+  `current-context` is one global pointer shared by every terminal. The
+  stricter design is request-scoped, as in NFSv4's current filehandle, which is
+  unset at the start of every request; that is what a multi-user host would
+  need and this one does not have.

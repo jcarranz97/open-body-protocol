@@ -19,6 +19,9 @@ Three questions 003 could not reach with two hardware-derived ids:
 3. **What happens when two bodies claim the same id?** The host cannot tell one
    body reached twice from two boards flashed alike: identical firmware
    produces identical descriptors.
+4. **Can a person put one body in focus** -- "I am operating the arm" -- without
+   the others becoming unreachable? And what should happen when the body in
+   focus cannot do what was asked?
 
 ## Requirements
 
@@ -66,6 +69,28 @@ more than one body attached, and ask it to do something involving a particular
 one. What is being tested is not the transport — 002 settled that — but
 whether an agent handed a dozen near-identical verbs picks the right body, and
 whether it recovers when one of them leaves mid-task.
+
+## Part D — selecting a body
+
+```bash
+uv run python3 tests/test_selection.py
+
+# the CLI refuses to guess when several bodies offer a verb
+uv run python3 host/obp_cli.py --fake-id arm --fake-id drone call blink times=2
+
+# selection is per-shell, like adb's $ANDROID_SERIAL
+OBP_BODY=fake-arm uv run python3 host/obp_cli.py \
+    --fake-id arm --fake-id drone call blink times=2
+```
+
+`host/lights_body.py` is a house's lights as one body, for the case where the
+thing you want to address is not the thing in focus:
+
+```bash
+uv run python3 host/obp_cli.py --fake-id arm call set_room_lights room=room1 on=true
+```
+
+Over MCP the same selection is `obp__use`, and `obp__status` reports it.
 
 ---
 
@@ -133,6 +158,147 @@ the transport object.
 
 ```
 
+### Part D — selecting a body ✅ 2026-08-24
+
+Three bodies: the Pico on USB standing in for an arm, the Pico W over WiFi for
+a drone, and a `house-lights` hub. The arm is selected; the lights still work.
+
+```text
+3 bodies, 8 verbs offered to the agent
+  picow-7c6e37     via mqtt   ['set_led', 'blink', 'reboot']
+  pico-3f5022      via usb    ['set_led', 'blink', 'set_brightness']
+  house-lights     via local  ['set_room_lights', 'room_status']
+
+--- selecting the arm: pico-3f5022 ---
+   selected: Raspberry Pi Pico body (pico-sdk) [pico-3f5022]
+
+unqualified "blink" goes to the arm:
+   -> pico-3f5022   (used the selected body 'pico-3f5022')
+    blinked 2 times
+
+"turn on the lights in room1" -- with the arm still selected:
+    3 lights on in room1
+    6 lights on in all; 2 unreachable: counter_2, hall_2
+```
+
+From the CLI, where selection is an environment variable:
+
+```text
+$ obp_cli.py --fake-id arm --fake-id drone call blink times=2
+no body is selected and 2 bodies offer 'blink': fake-arm, fake-drone. Select one, or name it.
+
+$ OBP_BODY=fake-arm obp_cli.py ... call blink times=2
+(used the selected body 'fake-arm')
+blinked 2 times
+
+$ OBP_BODY=fake-arm obp_cli.py ... call servo_angle angle=45
+the selected body 'fake-arm' does not offer 'servo_angle'. fake-drone does.
+Name it explicitly, or select it.
+```
+
+`tests/test_selection.py` — **all passed**:
+
+| Check | Result |
+|---|---|
+| Selecting a body leaves the tool list byte-identical | ✅ |
+| No `list_changed` is emitted, so no prompt cache is discarded | ✅ |
+| Unselected bodies stay callable — the lights work with the arm selected | ✅ |
+| An unqualified verb goes to the selection, and the host says so | ✅ |
+| A verb the selection lacks is refused, naming the bodies that have it | ✅ |
+| A failed selection **clears**, rather than leaving a stale one | ✅ |
+| A selected body that departs is kept but reported as absent | ✅ |
+
+## The design, and why it is shaped like this
+
+**Selection is host-side state and nothing else.** It does not filter the tool
+list, does not rename a verb, and is never sent to a body. Three independent
+reasons, any one of which is decisive:
+
+- **MCP forbids the alternative.** The 2026-07-28 revision (SEP-2567) requires
+  that `tools/list` not depend on per-connection or prior-tool-call state,
+  precisely so clients can cache it. A list that changed with the selection
+  would not be conformant.
+- **It would be the most expensive thing we could do.** Tool definitions sit at
+  the front of a model's cache prefix, and changes at one level invalidate that
+  level and every later one — so swapping the tool set discards the tools
+  block, the system prompt *and* the whole conversation. Selecting five times
+  costs more than showing every body's verbs all session.
+- **It would break the case that motivated the feature.** With the arm
+  selected, "turn on the lights in room1" has to work. It only can if the
+  lights body's verbs were never taken away.
+
+Anthropic's own guidance says the same in one line: *if you need modes, do not
+swap the tool set — give the model a tool that records the mode transition.*
+That tool is `obp__use`, and its result is ordinary conversation the model
+reads.
+
+**A failed selection clears; it does not leave the previous one standing.**
+IMAP settled this decades ago — *"if a mailbox is selected and a SELECT command
+that fails is attempted, no mailbox is selected."* POSIX `chdir` does the
+opposite, and a failed `cd` leaving a live stale selection is ShellCheck SC2164
+and the Steam `rm -rf "$STEAMROOT/"*` incident. For a body the difference is
+physical: ask for the drone, miss, keep the arm selected, and the next
+unqualified `move` drives the arm.
+
+**Selection is refused, never silently retargeted.** `move` on a drone and
+`move` on an arm are the same word and very different outcomes. The refusal
+names the bodies that *can* do it, because "no" is far more useful with "but
+these can" attached — one round trip instead of one wrong motion.
+
+**The implicit path narrates itself, the explicit one does not.** `kubectl` has
+this backwards: its cluster-scope warning fires only when you typed
+`--namespace`, so the ambient case, the one that needs telling, is the silent
+one. Here, a body chosen *by selection* says so; a body named outright does not
+need a commentary.
+
+**The CLI keeps selection in `$OBP_BODY`, not a state file.** This is `adb`'s
+model — `$ANDROID_SERIAL` plus `-s`, and a flat refusal to guess when several
+devices match. A state file would be `kubectl`'s `current-context`: one global
+mutable pointer shared by every terminal, so the same command means different
+things in two windows.
+
+## The lights, and why they are one body
+
+`host/lights_body.py` is a house's lighting as **one** body with rooms as verb
+arguments:
+
+```json
+{"name": "set_room_lights",
+ "inputSchema": {"type": "object", "properties": {
+   "room": {"type": "string", "enum": ["room1", "kitchen", "hall", "all"]},
+   "on": {"type": "boolean"}}, "required": ["room", "on"]}}
+```
+
+**No protocol change was needed.** `enum` on a string is already inside the
+[restricted subset](../../docs/spec/descriptors.md) a microcontroller can build
+with a table, and the fan-out happens inside the body, where `B13` already puts
+execution. The host never learns there are fifty-two bulbs.
+
+The alternative — bulbs as bodies, or a `units` array in the descriptor — would
+have rebuilt the Zigbee-cluster / Matter-endpoint model that
+[`rationale.md`](../../docs/rationale.md) explicitly rejects, and would have run
+straight into `B14`. Every protocol that does fan out at the transport layer
+(Matter, Zigbee, Bluetooth Mesh, MAVLink) makes fan-out and feedback *mutually
+exclusive* by hard requirement: a groupcast gets no acknowledgement, because
+fifty-two replies would flood the network. Keeping the fan-out inside one body
+means one call and one honest answer.
+
+Two things that body does are worth copying, and neither is a protocol rule:
+
+- **It reports both halves** — `6 lights on in all; 2 unreachable: counter_2,
+  hall_2`. Home Assistant's light group computes availability as `any(member
+  available)`, so it reads healthy with five of fifty-two members dead. And a
+  message naming only the failures reads as total failure.
+- **It has no `toggle_room`.** Anything that fans out takes an absolute state,
+  so a retry after a partial failure is safe. A toggle that reached 47 of 52
+  bulbs leaves a house no second command can repair.
+
+The boundary this suggests is not "is it a robot" — a terminal is a body too.
+It is **granularity**: a body is one thing with a single presence and one
+coherent set of verbs. A bulb fails that not for being unrobotic but for being
+too small to be worth its own identity, connection and presence lifecycle.
+
+
 ---
 
 ## What came out of building it
@@ -176,6 +342,14 @@ expectations from it.
 
 - **Two bodies acting together on one task** — a leg here and a leg there. The
   registry routes; it does not coordinate, and nothing here needs it to.
+- **Whether a model actually honours the selection.** Part D proves the host
+  offers, refuses and reports correctly. Whether an agent handed a stated
+  selection and a dozen near-identical verbs then picks the right one is Part
+  C, and it is still open.
+- **Selection with more than one caller.** One registry holds one selection.
+  Two people driving one host would want one each, which is the request-scoped
+  design ([NFSv4's current filehandle](../../docs/open-questions.md)) rather
+  than the process-scoped one built here.
 - **Many bodies over one broker at distance.** Everything is on one LAN.
 - **Scale past a dozen.** Eight is enough to break naming and routing; it is
   not a load test.

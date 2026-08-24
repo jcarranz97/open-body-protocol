@@ -31,6 +31,11 @@ KNOWN_REVISIONS = {
 DEFAULT_REVISION = "2025-06-18"
 
 
+def _text(message: str, is_error: bool = False) -> dict[str, Any]:
+    """A host-side result in the same shape a body would have returned."""
+    return {"content": [{"type": "text", "text": message}], "isError": is_error}
+
+
 class McpServer:
     def __init__(self, registry: Registry, log_path: Path | None = None,
                  out: TextIO | None = None,
@@ -91,8 +96,58 @@ class McpServer:
         "inputSchema": {"type": "object", "properties": {}},
     }
 
+    #: Records which body an unqualified instruction means. It deliberately
+    #: changes NO tool definitions: MCP 2026-07-28 forbids tools/list varying
+    #: with prior-call state, and tool definitions sit at the front of a
+    #: model's cache prefix, so swapping them would invalidate the entire
+    #: conversation. The selection lives in this tool's result and in
+    #: obp__status -- both of which are ordinary conversation the model reads.
+    USE_TOOL = {
+        "name": "obp__use",
+        "description": ("[host] Choose which body an instruction means when the "
+                        "user does not name one -- 'now drive the arm'. Every "
+                        "body's verbs stay available and callable by name, so a "
+                        "different body can still be addressed at any time. Pass "
+                        "an empty body to clear the selection."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "body": {"type": "string",
+                         "description": "The body id to select, or empty to clear."}
+            },
+        },
+    }
+
+    def _use(self, body_id: str | None) -> dict[str, Any]:
+        """Set the selection. Never changes the tool list -- see USE_TOOL."""
+        if body_id is None:
+            self.registry.select(None)
+            return _text("selection cleared; name a body explicitly from now on")
+        known = {b.id for b in self.registry.bodies}
+        if body_id not in known:
+            # A failed selection CLEARS, it does not leave the previous one
+            # standing. IMAP settled this: "if a mailbox is selected and a
+            # SELECT command that fails is attempted, no mailbox is selected."
+            # POSIX chdir does the opposite -- a failed cd is a no-op that
+            # leaves the stale selection live, which is ShellCheck SC2164 and
+            # the Steam `rm -rf "$STEAMROOT/"*` incident.
+            #
+            # For a body the difference is physical. Ask for the drone, miss,
+            # and keep the arm selected, and the next unqualified "move" drives
+            # the arm. Clearing makes that instruction fail loudly instead.
+            self.registry.select(None)
+            listing = ", ".join(sorted(known)) or "none"
+            return _text(f"'{body_id}' is not present, so nothing is selected now "
+                         f"(a failed selection clears rather than leaving the "
+                         f"previous one). Bodies present: {listing}",
+                         is_error=True)
+        self.registry.select(body_id)
+        return _text(f"{self.registry.selection_note()}. Every other body's verbs "
+                     f"are still available by name.")
+
     def _tool_list(self) -> dict[str, Any]:
-        return {"tools": sorted(self.registry.tools() + [self.STATUS_TOOL],
+        return {"tools": sorted(self.registry.tools()
+                                + [self.STATUS_TOOL, self.USE_TOOL],
                                 key=lambda t: t["name"])}
 
     def _status(self) -> dict[str, Any]:
@@ -166,6 +221,9 @@ class McpServer:
             args = params.get("arguments") or {}
             if name == self.STATUS_TOOL["name"]:
                 self._reply(req_id, self._status())
+                return
+            if name == self.USE_TOOL["name"]:
+                self._reply(req_id, self._use(args.get("body") or None))
                 return
             # M5/M7: the body's own result passes through unchanged, and a
             # body that has gone produces an isError result, never a fault.

@@ -124,6 +124,15 @@ def main() -> int:
     c.add_argument("--body")
     args = p.parse_args()
 
+    # Selection is per-shell, in the environment, exactly as adb does it with
+    # $ANDROID_SERIAL plus -s. Deliberately NOT a state file: kubectl's
+    # current-context is one global mutable pointer shared by every terminal,
+    # so the same command means different things in two windows -- the shape
+    # behind a documented three-hour production incident. An environment
+    # variable is scoped to the shell that set it, dies with it, and shows up
+    # in `env` where a person can see it.
+    ambient = os.environ.get("OBP_BODY")
+
     # Inherited from 003, where defaulting to the broker was the point. Here
     # --fake and --fake-id are sources of bodies too, so only fall back to the
     # broker when the user named no source at all.
@@ -131,6 +140,8 @@ def main() -> int:
         args.mqtt = True
 
     reg, conn = attach(args)
+    if ambient:
+        reg.select(ambient)
     try:
         if not reg.bodies:
             print("no bodies present", file=sys.stderr)
@@ -162,12 +173,15 @@ def main() -> int:
                 print()
             return 0
 
-        target = next((i for i in reg.bodies
-                       if (not args.body or i.id == args.body) and i.tool(args.verb)), None)
-        if target is None:
-            print(f"no present body offers '{args.verb}'", file=sys.stderr)
+        body_id, note = reg.resolve(args.verb, args.body)
+        if body_id is None:
+            print(note, file=sys.stderr)
             return 2
-        result = reg.call(mcp_tool_name(target.id, args.verb),
+        if note:
+            # The implicit path narrates itself; a body named explicitly does
+            # not need a running commentary.
+            print(f"({note})", file=sys.stderr)
+        result = reg.call(mcp_tool_name(body_id, args.verb),
                           dict(parse_kv(a) for a in args.args), autonomous=False)
         print(render_result(result))
         return 1 if result.get("isError") else 0
