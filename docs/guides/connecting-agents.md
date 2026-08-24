@@ -34,12 +34,27 @@ Claude Code:
 claude mcp add obp -- obp mcp
 ```
 
-Anything with an `mcpServers` config — OpenCode, Cursor, Codex, Claude
-Desktop:
+Cursor, Codex, Claude Desktop and anything else using the `mcpServers`
+shape:
 
 ```json
 {"mcpServers": {"obp": {"command": "obp", "args": ["mcp"]}}}
 ```
+
+OpenCode uses a different shape and has no add command — declare it in
+`opencode.json`, where a file in the working directory scopes to that
+project:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "obp": {"type": "local", "command": ["obp", "mcp"], "enabled": true}
+  }
+}
+```
+
+`opencode mcp list` shows whether it connected.
 
 **Do not name a device node in that configuration.** `/dev/ttyACM0` is not an
 identity: a board that re-enumerates becomes `/dev/ttyACM1` and the host is

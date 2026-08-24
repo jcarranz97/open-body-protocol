@@ -134,6 +134,82 @@ asks for.
 
 Remove it afterwards with `claude mcp remove obp`.
 
+## Part E — OpenCode, through MCP
+
+The same server, a different agent. **OpenCode has no `mcp add` command** —
+MCP servers are declared in a config file, and one that lives in the working
+directory applies to that project.
+
+`opencode.json` is committed alongside this experiment, so from here it is
+already configured:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "obp": {
+      "type": "local",
+      "command": ["python3", "host/obp_mcp.py", "--log", "/tmp/obp-mcp.log"],
+      "enabled": true,
+      "cwd": "."
+    }
+  }
+}
+```
+
+Verify before starting a session:
+
+```bash
+cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
+opencode mcp list
+```
+
+```text
+┌  MCP Servers
+│
+●  ✓ obp  connected
+│      python3 host/obp_mcp.py --log /tmp/obp-mcp.log
+│
+└  1 server(s)
+```
+
+**If `id` does not list `dialout`**, the server will connect but attach no
+body — `obp__status` will be its only verb. Either log out and back in, or
+change the command array to the wrapped form:
+
+```json
+"command": ["sg", "dialout", "-c", "python3 host/obp_mcp.py --log /tmp/obp-mcp.log"]
+```
+
+Both forms are verified: the plain one offers `obp__status` alone from a
+session without the group, and the wrapped one offers all five tools.
+
+Then run `opencode` and use the same prompts as Part D:
+
+> *Blink the robot twice.*
+> *Put the LED to 25%.*
+> *Blink it twenty times.*
+> *Reboot the robot.*
+
+### What to compare against Claude Code
+
+| | Watch for |
+|---|---|
+| Revision | `/tmp/obp-mcp.log` — Claude Code negotiated `2025-11-25`; does OpenCode differ? |
+| Discovery | Does it call `tools/list` once, or re-list per turn? |
+| `tools/list_changed` | Unplug mid-session: does OpenCode act on the notification the way Claude Code did? |
+| Naming | Do the `body__verb` names read as well in its UI? |
+| `userOnly` | Does asking to reboot produce a clean refusal? |
+
+The log is shared, so the two agents' conversations sit side by side in
+`/tmp/obp-mcp.log` and can be compared directly.
+
+### Part E results ⏳
+
+```text
+
+```
+
 ---
 
 ## Results
