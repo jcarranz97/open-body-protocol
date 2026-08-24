@@ -18,21 +18,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from obp import (BodyClient, BodyError, BodyUnavailable, Registry,  # noqa: E402
-                 SerialTransport, SubprocessTransport, describe_spec, resolve)
+                 SerialTransport, SubprocessTransport, describe_spec, expand,
+                 resolve)
 from obp.client import render_result  # noqa: E402
 from obp.naming import mcp_tool_name  # noqa: E402
 
 
 def attach(args) -> Registry:
     reg = Registry()
-    for spec in args.port:
+    for spec in expand(args.port or ([] if args.fake else ['auto'])):
         path = resolve(spec)
         if path is None:
             raise SystemExit(describe_spec(spec))
         client = BodyClient(SerialTransport(path))
         client.transport.open()
         reg.add(client)
-    if args.fake or not args.port:
+    if args.fake:
         client = BodyClient(SubprocessTransport(
             [sys.executable, str(Path(__file__).parent / "fake_body.py")]))
         client.transport.open()
@@ -54,8 +55,9 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--port", action="append", default=[],
-                   help="device path, /dev/serial/by-id/... path, or a fragment "
-                        "of the board serial such as 3f5022; repeatable")
+                   help="'auto' (the default) attaches every USB serial device; "
+                        "or give a device path, a /dev/serial/by-id/... path, or "
+                        "a fragment of the board serial such as 3f5022. Repeatable.")
     p.add_argument("--fake", action="store_true", help="attach the hardware-free body")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("bodies", help="which bodies are present")

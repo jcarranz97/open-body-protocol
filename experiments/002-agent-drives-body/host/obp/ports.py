@@ -26,6 +26,25 @@ def stable_ports() -> list[str]:
     return sorted(str(p) for p in BY_ID.iterdir() if p.is_symlink())
 
 
+AUTO = "auto"
+
+
+def expand(specs: list[str]) -> list[str]:
+    """Turn a list of port specs into concrete paths.
+
+    `auto` expands to every USB serial device currently attached, which is
+    what a host should default to: naming a device node in a config file is
+    how experiment 002 ended up pinned to a port the board had left.
+    """
+    out: list[str] = []
+    for spec in specs:
+        if spec == AUTO:
+            out.extend(stable_ports())
+        else:
+            out.append(spec)
+    return out
+
+
 def resolve(spec: str) -> str | None:
     """Turn a port spec into a usable path, or None if it is not present.
 

@@ -102,11 +102,22 @@ wrapped:
 cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
 
 # after logging out and back in:
-claude mcp add obp -- python3 "$PWD/host/obp_mcp.py" --port /dev/ttyACM0 --log /tmp/obp-mcp.log
+claude mcp add obp -- python3 "$PWD/host/obp_mcp.py" --log /tmp/obp-mcp.log
 
 # or, in a session that still lacks the group:
-claude mcp add obp -- sg dialout -c "python3 $PWD/host/obp_mcp.py --port /dev/ttyACM0 --log /tmp/obp-mcp.log"
+claude mcp add obp -- sg dialout -c "python3 $PWD/host/obp_mcp.py --log /tmp/obp-mcp.log"
 ```
+
+**Note there is no `--port`.** The default is `auto`: every USB serial device
+present is attached, and re-attached on each `obp__status`, so a board that
+re-enumerates or arrives later is picked up without touching the config.
+
+Earlier revisions of this file said `--port /dev/ttyACM0`, which pinned the
+server to a node the board eventually left — the exact mistake H5b exists to
+prevent, sitting in the setup instructions of the experiment that produced
+H5b. Naming a device node in a config file is the thing to avoid; `--port
+3f5022` (a serial fragment) or a `/dev/serial/by-id/...` path both work if
+something more specific is wanted.
 
 The server no longer dies when a body is unreachable — it starts anyway and
 offers `obp__status`, so an agent can ask what is wrong and read the answer
@@ -422,9 +433,31 @@ loss of presence; never report attach-time inventory as current presence) and
 **H5b** (address a serial body by a stable identifier, and re-resolve on
 reattach). `tests/test_departure.py` pins both.
 
-**Still untested:** a genuine physical unplug, now that the re-enumeration
-case is out of the way — does `tools/list_changed` reach Claude Code and make
-the verbs vanish from its context mid-session?
+### A fourth bug, in the documentation 🐛
+
+The unplug test failed again, and this time the fault was in this README.
+The `claude mcp add` line above said `--port /dev/ttyACM0`, so the server was
+pinned to a node the board had left. `obp__status` correctly reported
+`/dev/ttyACM0: not present` and listed the by-id path it should have been
+using — the diagnosis worked, the configuration was wrong.
+
+Writing H5b and then leaving an unstable device node in the setup
+instructions is a good illustration of why a specification needs worked
+examples that are themselves conformant.
+
+**Fixed by removing the choice.** `--port` now defaults to `auto`, attaching
+every USB serial device present and re-scanning on each `obp__status`. Nobody
+has to name a port, so nobody can name the wrong one.
+
+Worth recording from that run: **the CLI rescued the MCP path.** With the MCP
+server pinned to a dead node, the agent fell back to the shell, ran
+`describe`, hit the `dialout` problem, read the host's own explanation, used
+`sg`, and completed the blink. The two joins are not redundant — one
+diagnosed the other.
+
+**Still untested:** a genuine physical unplug with the server correctly
+configured — does `tools/list_changed` reach Claude Code and make the verbs
+vanish from its context mid-session?
 
 ### Which join felt better
 

@@ -41,6 +41,12 @@ Desktop:
 {"mcpServers": {"obp": {"command": "obp", "args": ["mcp"]}}}
 ```
 
+**Do not name a device node in that configuration.** `/dev/ttyACM0` is not an
+identity: a board that re-enumerates becomes `/dev/ttyACM1` and the host is
+left writing into a node that no longer exists. A host **SHOULD** discover
+attached bodies itself, and where a specific one must be named, use a stable
+identifier such as a `/dev/serial/by-id/` path ([presence](../spec/presence.md#device-paths-are-not-identities)).
+
 That is the whole integration. The agent now has verbs for every body
 present.
 
