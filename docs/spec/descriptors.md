@@ -143,5 +143,11 @@ into a silent, recurring cost.
 ## Namespacing
 
 Where a host presents verbs from several bodies at once, it **MUST**
-namespace them — `body.<id>.<name>` is the recommended form — and **MUST NOT**
-merge two bodies into one flat set.
+namespace them — `<body-id>__<name>` is the recommended form — and **MUST
+NOT** merge two bodies into one flat set.
+
+**Leave headroom.** A consumer may add its own prefix: OpenCode displays a
+tool as `<server>_<name>`, so a name that is legal at the host's limit can
+exceed the consumer's. Observed to be presentation-only there — the wire name
+was unchanged — but a host should not spend its entire budget assuming that
+holds everywhere.

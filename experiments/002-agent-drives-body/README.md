@@ -254,11 +254,53 @@ Then run `opencode` and use the same prompts as Part D:
 The log is shared, so the two agents' conversations sit side by side in
 `/tmp/obp-mcp.log` and can be compared directly.
 
-### Part E results ⏳
+### Part E results ✅ 2026-08-24
 
 ```text
-
+"Blink the led twice"
+  → obp_pico-3f5022__blink [times=2]
+  → "Done — blinked twice."
+  Build · qwen/qwen3.8-27b (Local) · 39.3s
 ```
+
+**The brain was a local open-weights model.** Not Claude, not any cloud API —
+`qwen3.8-27b` served from LM Studio on the same machine, reaching a physical
+Raspberry Pi Pico through the protocol. That is the strongest evidence so far
+for the claim the whole project rests on: the body does not care what is
+thinking, and the thinking does not have to be expensive or remote.
+
+It also took 39 seconds against Claude Code's ~10, which is the honest
+trade-off of a local model rather than anything the protocol did.
+
+**Startup record confirms the fix chain worked:**
+
+```json
+{"groups": [... "dialout" ...], "bodies": [{"id": "pico-3f5022", ...}]}
+```
+
+### One difference worth knowing: clients namespace too
+
+OpenCode displays the verb as `obp_pico-3f5022__blink` — its own server name,
+prefixed. But the **wire** name is unchanged:
+
+```text
+wire name: 'pico-3f5022__blink'  args: {"times": 2}
+```
+
+So the prefix is presentation, and our namespacing is unaffected. The
+consequence is a budget one: a client that prefixes may push a name that is
+legal for us (≤64) past *its* limit. A host should leave headroom rather than
+spending the full 64 characters.
+
+### What Part E settled
+
+- **A second agent, unmodified.** The host did not change at all; only the
+  configuration on the other side.
+- **A local model can drive physical hardware** through OBP.
+- **Client-side prefixing is display-only**, at least here — but budget for
+  it.
+- **Four integration traps, zero protocol problems**: a Unix group, a device
+  node, a working directory, and config precedence.
 
 ---
 
