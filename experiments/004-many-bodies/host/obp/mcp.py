@@ -47,6 +47,9 @@ class McpServer:
         self.out = out or sys.stdout
         self.log_path = log_path
         self.initialised = False
+        #: Roster at the previous status call, so a body's *return* can be
+        #: reported rather than left to be inferred from a list.
+        self._last_roster: set[str] = set()
         registry._on_change = self._notify_tools_changed
 
     # --------------------------------------------------------------- io
@@ -59,7 +62,14 @@ class McpServer:
         parsed, which defeats the point of writing it down.
         """
         rendered = json.dumps(payload)
-        if not full and len(rendered) > 400:
+        # A tools/list response is exactly what someone reads this file to
+        # check -- "did the body's verbs come back?" -- and at ~3KB it was
+        # the one message the 400-char cap destroyed. Diagnosing experiment
+        # 004's Part C came down to comparing the *sizes* of three truncated
+        # lines, which is not a diagnostic, it is a guess that happened to be
+        # right. Tool listings are kept whole; ordinary traffic is not.
+        keep_whole = full or "tools" in payload.get("result", {})
+        if not keep_whole and len(rendered) > 400:
             rendered = rendered[:400] + f"…+{len(rendered) - 400}b"
         line = f"{datetime.now(timezone.utc).isoformat()} {direction} {rendered}"
         print(line, file=sys.stderr)
@@ -158,6 +168,17 @@ class McpServer:
             self.problems = self.attach()      # retry; a fixed problem clears
         for note in departed:
             self.problems.insert(0, note)
+        # A body that has come back is the single most useful thing this
+        # answer can say, and it was the one thing it did not say. In Part C
+        # the Pico re-attached, list_changed fired, the client refetched and
+        # the verbs really were restored -- and the model, composing its reply
+        # in the same turn, still believed they were gone and never retried.
+        # An answer that only lists a roster leaves that inference to be made;
+        # naming the return, and saying the call can be retried, does not.
+        roster = {b.id for b in self.registry.bodies}
+        returned = sorted(roster - self._last_roster)
+        self._last_roster = roster
+
         lines = []
         for info in self.registry.bodies:
             verbs = ", ".join(t.name for t in info.tools if not t.user_only)
@@ -169,6 +190,11 @@ class McpServer:
         lines.append("")
         lines.append(self.registry.selection_note()
                      + ". Any body can still be called by name.")
+        if returned:
+            lines.insert(0, f"{', '.join(returned)} is back and its verbs are "
+                            f"available again — the call that failed can be "
+                            f"retried now.")
+            lines.insert(1, "")
         if self.problems:
             lines.append("")
             lines += self.problems

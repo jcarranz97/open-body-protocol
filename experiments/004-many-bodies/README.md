@@ -123,7 +123,7 @@ model *chooses*.
 | 3 | **"Now turn on the lights in room1."** | **The one this feature exists for.** With the arm selected it must still call `house-lights__set_room_lights`. A model that reads a stated selection as a *constraint* rather than a default will refuse, or ask permission it does not need. |
 | 4 | "Turn on all the lights." | The body answers `6 lights on in all; 2 unreachable: counter_2, hall_2`. Does the model pass the failure on, or flatten it to "done"? |
 | 5 | "Set the brightness to 20." *(with the Pico W selected)* | The Pico W cannot dim. The host refuses and names `pico-3f5022`. Does the model relay that, ask, or **silently retarget a physical action** — which is the failure mode every disambiguation study warns about? |
-| 6 | Unplug the USB Pico, then "blink the arm". | H6: a readable result, not a stall. Does it recover by calling `obp__status`, or keep calling a verb into a void? |
+| 6 | Unplug the USB Pico, then "blink pico-3f5022". | H6: a readable result, not a stall. Does it recover by calling `obp__status`, or keep calling a verb into a void? |
 | 7 | Plug it back in, then "blink it again". | M6: verbs return with no restart. Does the model retry, or has it concluded the body is gone for good? |
 
 Worth recording either way: a model that never touches `obp__use` and simply
@@ -213,24 +213,102 @@ one instruction, every body that can obey it:
 Both boards blinked. Nothing in the host distinguishes the three bindings past
 the transport object.
 
-### Part C ⏳
+### Part C ✅ 2026-08-24
 
-- Agent: `______` · bodies attached: `______`
+Claude Code (Opus 5), three bodies: `pico-3f5022` (USB), `picow-7c6e37`
+(WiFi), `house-lights` (subprocess).
 
 | # | Ask | Result |
 |---|---|---|
-| 1 | "What bodies do you have?" | ⬜ |
-| 2 | "I'm working on the Pico on USB. Blink it 3 times." | ⬜ |
-| 3 | "Now turn on the lights in room1." (arm still selected) | ⬜ |
-| 4 | "Turn on all the lights." | ⬜ |
-| 5 | "Set the brightness to 20." (Pico W selected) | ⬜ |
-| 6 | Unplug the USB Pico, then "blink the arm" | ⬜ |
-| 7 | Plug it back in, then "blink it again" | ⬜ |
+| 1 | "What bodies do you have?" | ✅ called `obp__status`, rendered the roster, and volunteered that with nothing selected an unqualified "blink the LED" is ambiguous between the two Picos |
+| 2 | "I'm working on the Pico on USB. Blink it 3 times." | ✅ reasoned that the non-W Pico cannot be the wireless one, called `obp__use`, then blinked |
+| 3 | **"Now turn on the lights in room1."** | ✅ **"The Pico stays selected, so unqualified instructions still go to `pico-3f5022`; naming the house lights reached them anyway."** |
+| 4 | "Turn on all the lights." | ✅ relayed both halves — "6 lit, but 2 didn't respond: counter_2 and hall_2" — and noted the verb is absolute so a retry is safe |
+| 5 | "Set the brightness to 20" *(premise: Pico W selected)* | ✅ corrected the premise twice: the Pico W was never selected, **and** it has no `set_brightness` at all |
+| 6 | "blink the arm" | ⚠️ correct answer, bad question — see below |
+| 7 | Unplug, re-attach, "blink it again" | ❌ **the host was right and the model was wrong** — see below |
+
+**Probe 3 is the one this feature exists for, and it passed on the first try.**
+A stated selection was treated as a default and not a constraint, exactly as
+designed — and the model said so unprompted.
+
+Probe 5 is worth noting for what did *not* happen: offered a plausible-sounding
+false premise, it neither silently retargeted the action nor accepted the
+premise. Silent retargeting of a physical action is the failure every
+disambiguation study warns about, and it did not occur.
+
+**Probe 6 was a bad probe.** The README asked for "blink the arm" when no body
+is named *arm* — the arm is a role this experiment gives `pico-3f5022` in
+prose, not an id. The model answered correctly ("nothing arm-shaped is
+configured") and even worked out that `move` would be the actuation verb if one
+existed. The question has been fixed to name the body.
+
+### Probe 7: the host was right, and the agent reported otherwise
+
+The Pico re-enumerated during a blink. From `/tmp/obp-mcp.log`:
 
 ```text
-
+15:26:50  tools/call pico-3f5022__blink
+15:26:50  --> notifications/tools/list_changed
+15:26:50  --> "...stopped responding and has been detached (SerialException: [Errno 5])"
+15:26:50  <-- tools/list                     -> +1679b   (the Pico's verbs gone)
+15:26:54  tools/call obp__status
+15:26:55  --> notifications/tools/list_changed
+15:26:55  --> "attached: ... [pico-3f5022] ..."
+15:26:55  <-- tools/list                     -> +3086b   (full again)
 ```
 
+3085 bytes at session start with all three bodies, 1679 with the Pico gone,
+**3086 after the re-attach**. Every host requirement held: the failure became a
+readable result (H6), the withdrawal and the return were both announced (M6),
+and the client refetched both times and received the restored list.
+
+The model nonetheless replied *"its four verbs are gone from my tool surface,
+so there is nothing for me to call"* and *"the host appears to have re-listed
+the body optimistically without the device actually being back"* — then stopped
+without retrying. The log ends there.
+
+Both claims were false. The most likely mechanism is timing: the refetched list
+arrives, but the reply is composed in the same turn, so the model is reasoning
+about the tool surface it had a moment ago and reports that as fact.
+
+This is not a failure the host can fix by being more correct, because it was
+already correct. Two changes came out of it:
+
+**The host stops creating the situation.** A link that can be repaired is now
+repaired in place: the transport is reopened — the by-id path is exactly what
+survives re-enumeration — and the body **never leaves the tool surface**, so no
+`list_changed` fires and nothing goes stale. `presence.md` already says a body
+that disappears and returns within a short window is the same body; this makes
+the registry act on it. A body that genuinely cannot be reopened is still
+detached, and that change is still announced.
+
+The call is **not** re-issued. The write failed, but "failed" and "did not
+happen" are different claims and this layer cannot tell them apart — blink
+twice is harmless, `move` twice is not. The link is repaired, the verbs stay,
+and the retry decision goes back to the caller with "the call may not have run".
+
+**`obp__status` now names a body that has come back**, rather than leaving it
+to be inferred from a roster: *"pico-3f5022 is back and its verbs are available
+again — the call that failed can be retried now."* The information was always
+in the answer; it was never in a sentence.
+
+**And the log stopped destroying the evidence.** Diagnosing this came down to
+comparing the *sizes* of three truncated lines, because the 400-character cap
+fell exactly on `tools/list` — the one message you read this file to check.
+Tool listings are now kept whole.
+
+`tests/test_link_recovery.py` — **all passed**:
+
+| Check | Result |
+|---|---|
+| A dropped link is a result, not a fault | ✅ |
+| It says the link was repaired and hands back the retry decision | ✅ |
+| Without claiming the call did or did not run | ✅ |
+| The body stays attached and its verbs never leave the tool surface | ✅ |
+| No `list_changed` for a blip, so no prompt cache is discarded | ✅ |
+| The caller's retry succeeds | ✅ |
+| A body that truly cannot be reopened is still detached and announced (H5) | ✅ |
 
 ### Part D — selecting a body ✅ 2026-08-24
 

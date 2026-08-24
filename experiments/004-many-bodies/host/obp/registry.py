@@ -245,6 +245,32 @@ class Registry:
         try:
             return entry.client.call(verb, arguments)
         except Exception as exc:
+            # A board that re-enumerates -- unplugged and back, or reset --
+            # raises here, and detaching it immediately is what made Part C
+            # go wrong: the verbs left the agent's tool surface, and even
+            # after obp__status put them back the model was still reasoning
+            # about a list it had already refreshed. presence.md says a body
+            # that disappears and returns within a short window is the same
+            # body; the by-id path this transport was opened with is exactly
+            # what survives re-enumeration, so try it once before giving up.
+            #
+            # What is NOT done is re-issuing the call. The write failed, but
+            # "failed" and "did not happen" are different claims, and this is
+            # the layer that cannot tell them apart. Blink twice is harmless;
+            # move twice is not. So the link is repaired, the body keeps its
+            # verbs, and the decision to retry goes back to the caller.
+            try:
+                entry.client.transport.close()
+                entry.client.transport.open()
+                entry.client._request("ping")
+            except Exception:
+                pass
+            else:
+                return _error(
+                    f"the link to '{entry.info.name}' dropped during this call "
+                    f"and has been re-established ({type(exc).__name__}). The "
+                    f"call may not have run. Its verbs are still available, so "
+                    f"retry if you still want it.")
             # Deliberately broad. Anything that goes wrong talking to a body
             # is a *presence* signal, and the caller must receive a result it
             # can read rather than a transport fault. A serial write to a
