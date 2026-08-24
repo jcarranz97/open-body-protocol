@@ -42,6 +42,17 @@ Validated in [experiment 001](../implementations.md#reference-bodies), where
 `level=150` and `direction=sideways` both returned readable errors from
 firmware written in two languages.
 
+**The payoff is composition, not politeness.** Asked for twenty blinks
+against a declared maximum of ten, an agent sent `times=20`, received *"times
+must be between 1 and 10"*, and issued two calls of ten — delivering what was
+asked while the body's limit held. An error that merely said *"invalid
+argument"* would have permitted an apology; naming the limit permitted a
+solution.
+
+Note also what the host did **not** do: it passed `20` down rather than
+pre-validating it away. A host that clamps arguments to be helpful hides the
+body's real constraints from the only party able to reason about them.
+
 | Situation | Response |
 |---|---|
 | Value out of range, bad enum, missing argument | result, `isError: true` |

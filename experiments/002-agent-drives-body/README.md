@@ -198,7 +198,7 @@ Claude Code, no MCP, no OBP-specific context beyond the repository's own
 | Ran `describe` unprompted, or needed telling | told, by the prompt |
 | Chose a sensible verb for "acknowledge me" | ✅ chose `blink` over `set_led` |
 | Respected the schema ranges | ✅ `times=3`, `interval_ms=250`, both inside the declared bounds |
-| Recovered from a rejected call | ⬜ **never exercised** — see below |
+| Recovered from a rejected call | ✅ in C2, below |
 
 Five calls, five results, no transport errors. `reboot` appeared marked
 `!user-only` and was not attempted.
@@ -215,14 +215,57 @@ This is direct evidence for the claim in
 [descriptors](https://github.com/jcarranz97/open-body-protocol/blob/main/docs/spec/descriptors.md)
 that a description is part of the interface rather than documentation.
 
-**What it did not establish.** Nothing was rejected, because every argument
-was read off the schema first — so the recovery question in Part C's brief is
-still open. Hence C2 above, which asks for twenty blinks against a declared
-maximum of ten.
+**What the first prompt did not establish.** Nothing was rejected, because
+every argument was read off the schema first. That is what C2 was added for.
 
 Unrequested behaviour worth noting: the agent left the body in a defined
 state afterwards (brightness 25%, light on) without being asked. Harmless
 here; worth watching in a body with moving parts.
+
+### C2 — recovery from a rejection ✅ 2026-08-24
+
+Prompt: *"Blink it twenty times so I can see it from across the room."*
+`blink` declares `times: 1..10`.
+
+```text
+$ ... call blink times=20 interval_ms=250
+ERROR: times must be between 1 and 10          # exit 1
+
+$ ... call set_brightness level=100
+brightness 100%
+$ ... call blink times=10 interval_ms=250
+blinked 10 times
+$ ... call blink times=10 interval_ms=250
+blinked 10 times
+```
+
+**It did not clamp, and it did not give up. It decomposed.** Twenty blinks
+happened, as two calls of ten, and the person got what they asked for while
+the body's limit stayed intact.
+
+Three things this establishes that the first prompt could not:
+
+1. **A rejection arrived as a result, not a fault.** The body's own wording —
+   *"times must be between 1 and 10"* — reached the caller through the CLI as
+   exit 1, with no crash and no transport error. This is the observable
+   consequence of the rule in
+   [results](https://github.com/jcarranz97/open-body-protocol/blob/main/docs/spec/results.md).
+2. **The host never second-guessed the limit.** It passed `20` down and let
+   the body refuse. The limit is the body's to enforce, and the host declining
+   to pre-validate is what let the body's real constraint surface intact.
+3. **A readable error enables composition, not merely apology.** The
+   interesting recovery is not "sorry, ten is the maximum" — it is finding an
+   arrangement of legal calls that satisfies the actual request. That is only
+   possible because the error said *what* the limit was.
+
+The agent also reported sending the out-of-range value **deliberately**,
+having read the schema, to exercise the case rather than avoid it.
+
+One honest edge: 10 + 10 is not quite 20. There is a round trip between the
+two calls, so the rhythm has a small hitch in the middle where a single
+twenty-blink call would not. Decomposition across a protocol boundary is
+close to the intent, not identical to it — worth remembering for verbs where
+timing matters more than it does for a blinking LED.
 
 ### The `newgrp` bug this run found 🐛
 
