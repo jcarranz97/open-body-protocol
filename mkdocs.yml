@@ -46,6 +46,7 @@ nav:
   - Implementations: implementations.md
   - Guides:
     - Connecting an agent: guides/connecting-agents.md
+  - Open questions: open-questions.md
   - Prior Art: prior-art.md
 
 markdown_extensions:
