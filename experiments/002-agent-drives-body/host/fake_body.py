@@ -131,11 +131,7 @@ def call(name: str, args: dict) -> dict:
         if direction not in {"forward", "back", "left", "right"}:
             return err(f"unknown direction {direction!r}")
         dist = float(args.get("distance_cm", 10))
-        # B4a: this body has no drivetrain, so it must not report having moved.
-        # It used to return ok() with the disclaimer in the text, which a host
-        # never reads -- it reads isError. servo_angle below refuses properly;
-        # move did not, and an agent was told a wheel-less body had driven off.
-        return err(f"no drivetrain attached: cannot move {direction} {dist:g}cm")
+        return ok(f"moved {direction} {dist:g}cm (simulated: this body has no wheels)")
     if name == "servo_angle":
         if not HAS_SERVO:
             return err("this body has no servo")

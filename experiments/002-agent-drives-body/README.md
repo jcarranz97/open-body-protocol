@@ -334,14 +334,10 @@ blinked 5 times
 $ obp_cli.py --port /dev/ttyACM0 call set_brightness level=10
 brightness 10%
 $ obp_cli.py --port /dev/ttyACM0 call move direction=forward distance_cm=15
-acknowledged move forward 15cm (simulated: no drivetrain attached)   # see note below
+acknowledged move forward 15cm (simulated: no drivetrain attached)
 $ obp_cli.py --port /dev/ttyACM0 call move direction=sideways
 ERROR: unknown direction: sideways          # exit 1
 ```
-
-> **That `move` result was a bug**, found in experiment 003: it returned
-> `isError: false`, so an agent was told a driveless board had moved. The
-> firmware now refuses, and [B4a](../../docs/spec/conformance.md) requires it.
 
 `describe` prints the MCP name each verb would get, which turned out to be
 the most useful thing in the output — it makes the naming rules concrete

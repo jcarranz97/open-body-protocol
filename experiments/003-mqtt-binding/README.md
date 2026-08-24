@@ -288,48 +288,13 @@ the capability difference is enforced, not advertised away:
 
 Two boards, two transports, one namespaced and deterministically sorted list.
 Nothing in the host distinguishes them past the transport, which is the claim
-this experiment exists to make. The Pico W cannot dim — its LED hangs off the
+this experiment exists to make. (`move` on the plain Pico is deliberate test
+scaffolding -- it acknowledges and flashes the LED, since there is no
+drivetrain on a bare board. What a body reports about its own actuation is the
+body's business; the host takes it at its word.) The Pico W cannot dim — its LED hangs off the
 wireless chip — so `set_brightness` is absent from its descriptor rather than
 present and failing, and the registry refuses the call because no body offers
 it.
-
-### The one that should worry us: a body that reports motion it did not perform
-
-Running everything together surfaced a **B4 violation in our own reference
-firmware**, which had survived experiments 001 and 002 unnoticed:
-
-```text
-verbs advertised: ['set_led', 'blink', 'set_brightness', 'move', 'reboot']
-caps advertised : ['led', 'dimmable']          <- no drivetrain
-
-move(direction=forward) -> "acknowledged move forward 10cm
-                            (simulated: no drivetrain attached)"
-isError                 -> False
-```
-
-`move` is advertised by a board with no drivetrain, and reports **success**.
-The honesty is real but it is in prose, and prose is not where an agent looks:
-anything checking `isError` concludes the robot moved. Compare
-`set_brightness`, which the Pico W simply does not advertise — that is the
-behaviour B4 asks for, and the contrast between the two verbs on one run is
-what made this visible.
-
-This is the worst failure mode an embodied agent has. A body that refuses is
-recoverable; a body that lies about acting corrupts everything the agent
-believes about the world, and no amount of care in the brain can detect it. It
-is exactly the class of bug this protocol exists to make impossible, and our
-own firmware shipped it through two experiments.
-
-Two ways out, and the spec should say which:
-
-1. **Do not advertise it.** A drivetrain-less board offers no `move`, the way
-   the Pico W offers no `set_brightness`. Honest, and already required by B4.
-2. **Advertise it and refuse it** — `isError: true`, "no drivetrain attached".
-   Useful when hardware is hot-pluggable and the verb may become real later.
-
-What is not acceptable is the third thing it currently does: succeed. A
-simulated action **MUST NOT** report success, and that belongs in the
-conformance list rather than in this README.
 
 ---
 

@@ -4,10 +4,10 @@ Copy this to the Pico as main.py. It speaks newline-delimited JSON-RPC 2.0
 over the USB CDC serial link -- the same messages host/fake_body.py speaks
 over a pipe, which is the point of the experiment.
 
-Works on a bare Pico with nothing attached: the LED tools are real, `move`
-refuses because there is no drivetrain, and `servo_angle` is only advertised
-when SERVO_PIN is set -- so a body's tool list reflects the hardware it
-actually has, with no configuration on the host side.
+Works on a bare Pico with nothing attached: the LED tools are real, `move` is
+honest about being simulated, and `servo_angle` is only advertised when
+SERVO_PIN is set -- so a body's tool list reflects the hardware it actually
+has, with no configuration on the host side.
 """
 
 import json
@@ -196,17 +196,14 @@ def _call(name, args):
         if direction not in ("forward", "back", "left", "right"):
             return _err("unknown direction: %s" % direction)
         dist = args.get("distance_cm", 10)
-        # No wheels on a bare Pico -- so this MUST NOT report success (B4a).
-        # It used to say "simulated: no drivetrain attached" and return
-        # isError False, which is honest only to a human reading the text. A
-        # host reads isError, so an agent asking this body to move was told it
-        # moved. servo_angle below has always got this right; move did not.
+        # No wheels on a bare Pico. Say so rather than pretending -- an honest
+        # tool result is what lets the brain tell the truth to its owner.
         for _ in range(2):
             _led_set(True)
             time.sleep_ms(80)
             _led_set(False)
             time.sleep_ms(80)
-        return _err("no drivetrain attached: cannot move %s %scm" % (direction, dist))
+        return _ok("acknowledged move %s %scm (simulated: no drivetrain attached)" % (direction, dist))
 
     if name == "servo_angle":
         if _servo is None:

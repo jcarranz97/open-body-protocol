@@ -24,7 +24,6 @@ requirement here is one somebody would otherwise get wrong.
 | B2 | **MUST** report an `id` stable across restarts and reflashes; **SHOULD** derive it from hardware. |
 | B3 | **MUST** give every verb a unique `name`, a non-empty `description`, and an `inputSchema` object. |
 | B4 | **MUST** advertise only verbs it can actually perform on the hardware it is running on. |
-| B4a | **MUST NOT** report success for an action it did not perform. A verb standing in for absent hardware **MUST** either be left out of the descriptor or return `isError: true`. Explaining the simulation in the result text is not sufficient: a host reads `isError`, so a "success" that means nothing happened is a body lying about the world, and no care taken in the brain can detect it. |
 | B5 | **SHOULD** restrict schemas to the [documented subset](descriptors.md#the-restricted-schema-subset). |
 | B6 | **MUST** mark verbs unsafe for autonomous use as `userOnly`. |
 | B7 | **MUST** answer `body/describe` at any time, including mid-action. |

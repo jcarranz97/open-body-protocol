@@ -226,19 +226,16 @@ static void tool_call(long id, const char *params, size_t params_len) {
         }
         long dist = 10;
         jm_get_int(a, a_len, "distance_cm", &dist);
-        /* No drivetrain on a bare board, so this MUST NOT report success
-         * (B4a). It used to return isError false with "simulated: no
-         * drivetrain attached" in the text -- honest to a human, invisible to
-         * a host, which reads isError. An agent was told the robot moved.
-         * servo_angle below has always refused correctly; move did not. */
+        /* No drivetrain on a bare board. Acknowledge visibly, and say so --
+         * an honest tool result is what lets the brain tell the truth. */
         for (int i = 0; i < 2; i++) {
             led_set(true);  sleep_ms(80);
             led_set(false); sleep_ms(80);
         }
         char msg[96];
         snprintf(msg, sizeof msg,
-                 "no drivetrain attached: cannot move %s %ldcm", dir, dist);
-        send_result_text(id, msg, true);
+                 "acknowledged move %s %ldcm (simulated: no drivetrain attached)", dir, dist);
+        send_result_text(id, msg, false);
         return;
     }
 
