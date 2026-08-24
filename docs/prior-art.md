@@ -1,5 +1,8 @@
 # Prior Art
 
+Who else is building pieces of the Open Body Protocol (OBP) problem, and
+under which licences.
+
 Nothing found does exactly *ESP32 pet + self-hosted brain + Telegram +
 homelab events*, but every individual piece exists and is worth reading
 before writing code. The gap is narrow enough to be worth being honest about:
@@ -60,7 +63,7 @@ you read only two things here, read the first two.
 - **Claude Code Channels** — a first-party extension point where *a channel
   is an MCP server* pushing external events into a running session, with
   Telegram and Discord plugins shipped and a documented build-your-own path.
-  A "OBP channel" is a legitimate design rather than a hack.
+  An "OBP channel" is a legitimate design rather than a hack.
 - **[`petdex`](https://github.com/crafter-station/petdex)** — not a pet
   project but a **sprite format**: `pet.json` plus a spritesheet of 192×208
   cells over nine named states, with a public gallery and a generator. Nous

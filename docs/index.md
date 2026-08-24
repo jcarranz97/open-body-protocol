@@ -1,6 +1,6 @@
-# OBP
+# Open Body Protocol (OBP)
 
-**OBP connects a brain to a body.**
+**Open Body Protocol (OBP) connects a brain to a body.**
 
 The brain is an AI agent — Claude, a local Qwen or Gemma, OpenClaw, Hermes,
 OpenCode, anything that can hold a conversation and call a tool. The body is

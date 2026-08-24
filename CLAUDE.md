@@ -1,3 +1,3 @@
-# OBP Agent Instructions
+# Open Body Protocol (OBP) — Agent Instructions
 
 @AGENTS.md

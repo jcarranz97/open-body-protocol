@@ -71,7 +71,7 @@ twice.
 
 ## 7. What is it called?
 
-OBP is a working codename. The docs avoid baking it into the protocol —
+Open Body Protocol (OBP) is a working codename. The docs avoid baking it into the protocol —
 topics are `obp/`, which is short enough to live with, and no payload field
 carries the product name.
 

@@ -1,9 +1,10 @@
-# OBP
+# Open Body Protocol (OBP)
 
-**OBP connects a brain to a body.** The brain is any AI agent — a model
-API, a local model, or a harness like OpenClaw, Hermes or OpenCode. The body
-is any hardware someone built, from a terminal window to a printed robot.
-The project is the standardised layer between them, and ships neither.
+**Open Body Protocol (OBP) connects a brain to a body.** The brain is any
+AI agent — a model API, a local model, or a harness like OpenClaw, Hermes or
+OpenCode. The body is any hardware someone built, from a terminal window to a
+printed robot. The project is the standardised layer between them, and ships
+neither.
 
 **Status: architecture.** There is no `daemon/`, `client/`, `bodies/` or
 `packs/` yet. There is a validated experiment under `experiments/`.
