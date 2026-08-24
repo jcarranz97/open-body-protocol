@@ -103,6 +103,12 @@ LED.
 A host **MUST** exclude `userOnly` verbs from any set offered to an
 autonomous decider, and **MAY** expose them in a human interface.
 
+**`userOnly` is about who is asking, not about what exists.** A host **MUST
+NOT** drop the verb from its own routing — a person at a terminal is
+entitled to reboot their own board. The reference host got this wrong first
+time, dropping such verbs at registration so that nothing could reach them,
+which is a different and worse behaviour than not offering them.
+
 ## Capability gating
 
 A body **MUST** advertise only verbs it can actually perform, and this is

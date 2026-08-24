@@ -65,6 +65,7 @@ requirement here is one somebody would otherwise get wrong.
 | H2 | **MUST** sort verbs deterministically before offering them onward. |
 | H3 | **MUST** namespace verbs when several bodies are present. |
 | H4 | **MUST** withhold `userOnly` verbs from autonomous callers. |
+| H4a | **MUST NOT** make a `userOnly` verb unreachable altogether; a human interface **MAY** invoke it. |
 | H5 | **MUST** withdraw a body's verbs when presence is lost. |
 | H6 | **MUST** synthesise an `isError` result — never hang — for a call to a body that has gone. |
 | H7 | **MUST** apply a timeout to every call and surface expiry as a result. |

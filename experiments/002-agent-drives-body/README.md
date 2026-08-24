@@ -21,6 +21,7 @@ cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
 
 python3 tests/test_naming.py       # MCP-safe tool names (M1–M3)
 python3 tests/test_mcp_server.py   # the whole MCP mapping, over a pipe
+python3 tests/test_useronly.py     # userOnly is about who is asking
 ```
 
 The second one speaks MCP to the server exactly as an agent would, and
@@ -96,44 +97,82 @@ through, `level=150` returning `isError` with the body's own wording, an
 unknown tool returning a result rather than a fault, `-32601` for an
 unimplemented method, and `ping`.
 
-### Part B — CLI against the Pico ⏳
+### Part B — CLI against the Pico ✅ 2026-08-24
 
-- Port: `______`  · Firmware: ⬜ pico-sdk ⬜ MicroPython
+Plain Raspberry Pi Pico, pico-sdk firmware, `/dev/ttyACM0`, Ubuntu.
 
 ```text
+$ obp_cli.py --port /dev/ttyACM0 bodies
+pico-3f5022   Raspberry Pi Pico body (pico-sdk)   4 verbs   caps: led, dimmable
 
+$ obp_cli.py --port /dev/ttyACM0 call blink times=5
+blinked 5 times
+$ obp_cli.py --port /dev/ttyACM0 call set_brightness level=10
+brightness 10%
+$ obp_cli.py --port /dev/ttyACM0 call move direction=forward distance_cm=15
+acknowledged move forward 15cm (simulated: no drivetrain attached)
+$ obp_cli.py --port /dev/ttyACM0 call move direction=sideways
+ERROR: unknown direction: sideways          # exit 1
 ```
+
+`describe` prints the MCP name each verb would get, which turned out to be
+the most useful thing in the output — it makes the naming rules concrete
+before an agent is anywhere near them.
+
+**Four verbs, not five.** `reboot` is `userOnly`, so it is excluded from the
+count and from anything an agent sees.
+
+### Part D — the MCP server against the real Pico ✅ 2026-08-24
+
+Not Claude Code yet: a scripted MCP client, speaking the same protocol an
+agent would, against the physical board.
+
+```text
+handshake: 2025-06-18 | listChanged: True
+tools: pico-3f5022__blink, pico-3f5022__move,
+       pico-3f5022__set_brightness, pico-3f5022__set_led
+
+  level=5    isError=False   brightness 5%
+  level=90   isError=False   brightness 90%
+  level=250  isError=True    level must be 0..100
+  blink:                     blinked 3 times
+```
+
+Sorted, namespaced, `reboot` withheld, and the board's own error wording
+reaching the caller unchanged through two protocol layers.
+
+### A bug this experiment found 🐛
+
+Calling `reboot` from the CLI failed with *"no body currently offers
+'pico-3f5022__reboot'"*.
+
+The registry had been dropping `userOnly` verbs at registration, so they were
+not merely unoffered — they were unroutable. **A person could not reboot
+their own board.**
+
+That is a misreading of the requirement. H4 says a host must withhold
+`userOnly` verbs *from autonomous callers*; the spec's own descriptor page
+says a host **MAY** expose them in a human interface. `userOnly` is about
+**who is asking**, not about what exists.
+
+Fixed: every verb is routable, `tools()` (the MCP surface) excludes
+`userOnly`, and `call()` takes `autonomous=` — an agent passes `True`, the
+CLI passes `False`. `tests/test_useronly.py` pins the distinction.
+
+Worth noting how it surfaced: not from reading the spec, but from a human
+trying to use the tool for its obvious purpose.
 
 ### Part C — Claude Code via the CLI ⏳
 
-| Check | Result |
-|---|---|
-| Ran `describe` unprompted, or needed telling | ⬜ |
-| Chose a sensible verb for "acknowledge me" | ⬜ |
-| Respected the schema ranges | ⬜ |
-| Recovered from a rejected call | ⬜ |
-
-Transcript, or the interesting parts:
-
-```text
-
-```
+_Not yet run. The question is behavioural, not mechanical: does an agent read
+the schemas, choose a sensible verb, respect the ranges, and recover from a
+rejection._
 
 ### Part D — Claude Code via MCP ⏳
 
-| Check | Result |
-|---|---|
-| `claude mcp add` succeeded | ⬜ |
-| Tools appeared with body-namespaced names | ⬜ |
-| Called a verb correctly from the schema | ⬜ |
-| Errors read as errors, not crashes | ⬜ |
-| Unplugging the body withdrew the tools mid-session | ⬜ |
-
-Which revision did Claude Code negotiate? (from `/tmp/obp-mcp.log`)
-
-```text
-
-```
+_The transport is proven above; what remains is whether Claude Code
+negotiates a revision the server offers, and whether unplugging the body
+withdraws its tools mid-session._
 
 ### Which join felt better
 

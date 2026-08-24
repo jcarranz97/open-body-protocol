@@ -109,10 +109,12 @@ def main() -> int:
             return 2
         spec = target.tool(args.verb)
         if spec.user_only:
-            print(f"note: {spec.name} is user-only; an agent must not call it",
+            print(f"note: {spec.name} is user-only — available here because a "
+                  f"person is asking, and never offered to an agent",
                   file=sys.stderr)
         result = reg.call(mcp_tool_name(target.id, args.verb),
-                          dict(parse_kv(a) for a in args.args))
+                          dict(parse_kv(a) for a in args.args),
+                          autonomous=False)
         print(render_result(result))
         return 1 if result.get("isError") else 0
     finally:

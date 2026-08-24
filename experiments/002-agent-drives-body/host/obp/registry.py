@@ -36,9 +36,9 @@ class Registry:
         """Connect, describe, and register. Raises BodyError on failure."""
         info = client.describe()
         entry = Entry(client=client, info=info)
+        # Every verb is routable; whether it is *offered* depends on who is
+        # asking. H4 is about autonomous callers, not about the host.
         for tool in info.tools:
-            if tool.user_only:
-                continue                       # H4: never offered onward
             entry.routes[mcp_tool_name(info.id, tool.name)] = (info.id, tool.name)
         self._bodies[info.id] = entry
         self._changed()
@@ -94,14 +94,24 @@ class Registry:
 
     # ------------------------------------------------------------- calls
 
-    def call(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Invoke a verb, returning an OBP/MCP result. Never raises."""
+    def call(self, tool_name: str, arguments: dict[str, Any],
+             *, autonomous: bool = True) -> dict[str, Any]:
+        """Invoke a verb, returning an OBP/MCP result. Never raises.
+
+        `autonomous` is the caller's nature, not a permission flag: an agent
+        passes True and a person at a terminal passes False. Only the first
+        is subject to H4, because `userOnly` exists to stop a model doing
+        something surprising — not to stop an owner rebooting their board.
+        """
         found = self.find(tool_name)
         if found is None:
             # H6: an unknown or departed body is a readable result, not an
             # exception, so the model can adapt instead of seeing a crash.
             return _error(f"no body currently offers '{tool_name}'")
         entry, verb = found
+        spec = entry.info.tool(verb)
+        if autonomous and spec is not None and spec.user_only:
+            return _error(f"'{verb}' is marked userOnly and may not be invoked autonomously")
         try:
             return entry.client.call(verb, arguments)
         except BodyError as exc:
