@@ -161,7 +161,14 @@ class McpServer:
         lines = []
         for info in self.registry.bodies:
             verbs = ", ".join(t.name for t in info.tools if not t.user_only)
-            lines.append(f"attached: {info.name} [{info.id}] — {verbs}")
+            mark = " (selected)" if info.id == self.registry.selected else ""
+            lines.append(f"attached: {info.name} [{info.id}]{mark} — {verbs}")
+        # The selection is host state, so status is where a caller learns it.
+        # An indicator belongs on the participants as well as in a summary
+        # line -- a single global note is the thing that goes stale.
+        lines.append("")
+        lines.append(self.registry.selection_note()
+                     + ". Any body can still be called by name.")
         if self.problems:
             lines.append("")
             lines += self.problems
