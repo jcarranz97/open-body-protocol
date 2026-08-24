@@ -275,3 +275,51 @@ So the open question is narrower than it looked. Nothing about an utterance
 needs new protocol. What OBP has no vocabulary for is a **media lane**: a way
 for a body to say "I have a stream, here is where to get it", negotiated by the
 control channel and carried somewhere else entirely.
+
+### How the working systems actually do it
+
+Surveying the harnesses that already bridge a chat app to an agent — Hermes,
+OpenCode, Goose — settles the shape, and corrects the question.
+
+**The message list is the database.** All three persist an inbound message to
+SQLite *first*, then rebuild the turn's context by re-reading the table. Goose
+re-reads the whole conversation on every turn; OpenCode re-reads the message
+list each loop iteration; Hermes replays transcript rows and keeps only a warm
+agent shell, not the state. None of them holds the conversation in process
+memory as the source of truth.
+
+So "how do we wake a sleeping session?" is the wrong question. Between turns
+there is no process state to wake — there are rows. An event does not need to
+interrupt anything; it needs to be *durably written where the next turn will
+read it*. A long-lived process then exists to notice and start that turn, which
+is a much weaker requirement than injecting into a live context.
+
+That is the same shape as the event log and the MQTT persistent session in
+[experiment 005](../experiments/005-body-speaks-first/), arrived at
+independently by three harnesses that had to make it work.
+
+**What happens to a message that arrives mid-turn is the real design axis, and
+nobody agrees.** Claude Code Channels queues and delivers grouped on the next
+turn. OpenCode queues, never rejects, never aborts. Goose *rejects* outright —
+"session already has active run". Hermes makes it configurable between
+interrupt, queue and steer, defaulting to interrupt.
+
+This matters here because a robot's events are exactly the mid-turn case: a
+button gets pressed while the agent is doing something else. Four production
+systems chose four different answers, which is a strong hint that OBP should
+carry the event and let the host decide, rather than legislate.
+
+**And the seam is visible in the naming.** ACP has standardised starting a turn
+— `session/new`, `session/prompt`, `session/update`,
+`session/request_permission` — but *not* interrupting or amending one in
+flight. Goose had to invent `_goose/unstable/session/steer`; the vendor prefix
+and the `unstable` are the tell. Hermes invented a different one. Interrupting
+a running turn is the next unstandardised frontier, and it is precisely what a
+body that speaks unprompted needs most.
+
+**One constraint recurs everywhere and is worth knowing before designing:**
+Telegram long-polling allows a single consumer per bot token. That one fact is
+what forces the "one session owns the bot" shape in Claude Code's plugin, in
+Goose's gateway and in most community bridges. Webhooks appear only where a
+hosted relay or a suspendable cloud machine already exists — which is the same
+NAT story the transport research told.
