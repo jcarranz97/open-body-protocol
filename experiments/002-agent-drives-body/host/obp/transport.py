@@ -74,6 +74,10 @@ class SubprocessTransport:
         return self.proc is not None and self.proc.poll() is None
 
 
+class BodyUnavailable(RuntimeError):
+    """A body could not be attached. The message is written for a person."""
+
+
 def _explain_open_failure(port: str, exc: Exception) -> str:
     """Turn an unhelpful OS error into the thing the caller has to do.
 
@@ -137,7 +141,7 @@ class SerialTransport:
         try:
             self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
         except serial.SerialException as exc:
-            raise SystemExit(_explain_open_failure(self.port, exc)) from exc
+            raise BodyUnavailable(_explain_open_failure(self.port, exc)) from exc
         # A Pico that was already running has buffered output; drop it so the
         # first response we parse is genuinely ours.
         time.sleep(0.2)

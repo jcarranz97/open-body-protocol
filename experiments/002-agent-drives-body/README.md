@@ -88,10 +88,28 @@ something sensible to you either way.
 
 ## Part D — Claude Code, through MCP
 
+**First, the permission trap again — it bites harder here.** Claude Code
+spawns the server as a child of its own session, so the server inherits
+whatever groups that session has. If `id` does not list `dialout`, the port
+fails inside a process you cannot see, and `/mcp` reports only
+`Failed to reconnect to obp: CONNECTION_CLOSED`.
+
+The clean fix is to log out and back in. Failing that, register the server
+wrapped:
+
 ```bash
 cd ~/repos/open-body-protocol/experiments/002-agent-drives-body
+
+# after logging out and back in:
 claude mcp add obp -- python3 "$PWD/host/obp_mcp.py" --port /dev/ttyACM0 --log /tmp/obp-mcp.log
+
+# or, in a session that still lacks the group:
+claude mcp add obp -- sg dialout -c "python3 $PWD/host/obp_mcp.py --port /dev/ttyACM0 --log /tmp/obp-mcp.log"
 ```
+
+The server no longer dies when a body is unreachable — it starts anyway and
+offers `obp__status`, so an agent can ask what is wrong and read the answer
+out to you.
 
 Then in a session:
 
@@ -292,11 +310,60 @@ The general lesson is worth more than the fix: **advice written for a human
 was silently wrong for an agent**, in a project whose entire purpose is
 agents driving hardware.
 
-### Part D — Claude Code via MCP ⏳
+### Part D — first attempt ❌ 2026-08-24, and the bug it found
 
-_The transport is proven above; what remains is whether Claude Code
-negotiates a revision the server offers, and whether unplugging the body
-withdraws its tools mid-session._
+```text
+❯ /mcp
+  ⎿  Failed to reconnect to obp: CONNECTION_CLOSED
+```
+
+Claude Code (v2.1.241) registered the server and could not talk to it. The
+cause was the same `dialout` membership as Part C — Claude Code spawns the
+server as a child of its own session, so the server inherited a group list
+without `dialout` — but **three bugs of mine turned a fixable permission
+problem into an unexplainable dead connection.**
+
+| Bug | Fix |
+|---|---|
+| `SerialTransport` raised `SystemExit` on `EACCES`. Fine for a CLI; fatal for a server. | Raises `BodyUnavailable`, an ordinary exception a caller can handle |
+| `obp_mcp.py` exited when no body attached | Starts regardless. A server that exits because a cable is unplugged looks to an agent exactly like a broken server |
+| The `--log` file was never written, because the failure happened before logging began | Attach failures are recorded and reported |
+
+**And the fix that matters most: the server now always offers `obp__status`.**
+With nothing attached, an agent asking it receives:
+
+```text
+isError: true
+
+/dev/ttyACM0:
+Permission denied opening /dev/ttyACM0.
+/dev/ttyACM0 is owned by group 'dialout' and this process is not in it.
+
+  sudo usermod -aG dialout $USER      # once, permanently
+  ...
+  sg dialout -c '<command>'           # one command, non-interactive
+```
+
+So the failure is now something the agent can read and explain to the person
+sitting there, instead of a connection that closed for no stated reason.
+Calling it again retries the attach, so a fixed permission clears without
+restarting the session.
+
+With the group present, the same server attaches cleanly:
+
+```text
+tools: obp__status, pico-3f5022__blink, pico-3f5022__move,
+       pico-3f5022__set_brightness, pico-3f5022__set_led
+status: attached: Raspberry Pi Pico body (pico-sdk) [pico-3f5022]
+        — set_led, blink, set_brightness, move
+```
+
+### Part D — with an agent ⏳
+
+_Re-run after logging out and back in, or with the `sg` wrapper above. What
+remains: which MCP revision Claude Code negotiates (`/tmp/obp-mcp.log` will
+say), whether unplugging the body withdraws its tools mid-session, and how
+the same two prompts feel compared with the CLI._
 
 ### Which join felt better
 

@@ -12,7 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from obp import BodyClient, BodyError, Registry, SerialTransport, SubprocessTransport  # noqa: E402
+from obp import (BodyClient, BodyError, BodyUnavailable, Registry,  # noqa: E402
+                 SerialTransport, SubprocessTransport)
 from obp.mcp import McpServer  # noqa: E402
 
 
@@ -24,29 +25,48 @@ def main() -> int:
     args = p.parse_args()
 
     registry = Registry()
-    server = McpServer(registry, log_path=args.log)
+    problems: list[str] = []
 
-    for port in args.port:
-        try:
-            client = BodyClient(SerialTransport(port))
-            client.transport.open()
-            info = registry.add(client)
-            print(f"attached {info.name} [{info.id}] on {port}", file=sys.stderr)
-        except (BodyError, OSError) as exc:
-            print(f"could not attach {port}: {exc}", file=sys.stderr)
+    def attach() -> list[str]:
+        """Attach whatever is reachable. Never fatal: an MCP server that
+        exits because a cable is unplugged looks to the agent exactly like a
+        broken server, and the user learns nothing."""
+        problems.clear()
+        attached = {b.id for b in registry.bodies}
+        targets = list(args.port)
+        for port in targets:
+            if any(port in str(getattr(e.client.transport, "port", "")) 
+                   for e in registry._bodies.values()):
+                continue
+            try:
+                client = BodyClient(SerialTransport(port))
+                client.transport.open()
+                info = registry.add(client)
+                print(f"attached {info.name} [{info.id}] on {port}", file=sys.stderr)
+            except BodyUnavailable as exc:
+                problems.append(f"{port}:\n{exc}")
+            except (BodyError, OSError) as exc:
+                problems.append(f"{port}: {exc}")
+        if (args.fake or not args.port) and not any(
+                b.id.startswith("fake-") for b in registry.bodies):
+            try:
+                client = BodyClient(SubprocessTransport(
+                    [sys.executable, str(Path(__file__).parent / "fake_body.py")]))
+                client.transport.open()
+                info = registry.add(client)
+                print(f"attached {info.name} [{info.id}]", file=sys.stderr)
+            except (BodyError, OSError) as exc:
+                problems.append(f"fake body: {exc}")
+        return list(problems)
 
-    if args.fake or not args.port:
-        client = BodyClient(SubprocessTransport(
-            [sys.executable, str(Path(__file__).parent / "fake_body.py")]))
-        client.transport.open()
-        info = registry.add(client)
-        print(f"attached {info.name} [{info.id}]", file=sys.stderr)
+    server = McpServer(registry, log_path=args.log, attach=attach)
+    attach()
+    server.problems = list(problems)
 
-    if not registry.bodies:
-        print("no bodies attached; exiting", file=sys.stderr)
-        return 1
+    for p in problems:
+        print(p, file=sys.stderr)
+    print(f"serving {len(registry.bodies)} bodies over MCP on stdio", file=sys.stderr)
 
-    print(f"serving {len(registry.tools())} tools over MCP on stdio", file=sys.stderr)
     try:
         server.serve()
     except KeyboardInterrupt:

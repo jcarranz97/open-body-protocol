@@ -7,10 +7,10 @@ transport and client are copied from 001 rather than shared.
 from .client import BodyClient, BodyError, ToolSpec
 from .naming import mcp_tool_name, split_tool_name
 from .registry import Registry
-from .transport import SerialTransport, SubprocessTransport
+from .transport import BodyUnavailable, SerialTransport, SubprocessTransport
 
 __all__ = [
     "BodyClient", "BodyError", "ToolSpec", "Registry",
     "mcp_tool_name", "split_tool_name",
-    "SerialTransport", "SubprocessTransport",
+    "SerialTransport", "SubprocessTransport", "BodyUnavailable",
 ]

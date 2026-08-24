@@ -130,6 +130,17 @@ Blocking is the default recommendation. An agent waiting four seconds for a
 robot to finish turning is behaving correctly; an agent juggling call ids
 usually is not.
 
+#### When no body is attached
+
+A host **MUST** start and stay running with nothing attached, and **SHOULD**
+expose a status verb saying why — an agent that receives *"permission denied
+on /dev/ttyACM0, the process is not in group dialout"* can tell the person
+sitting there what to do. One that receives `CONNECTION_CLOSED` cannot.
+
+This is not hypothetical: the reference host exited on an unreachable port,
+and the resulting failure was indistinguishable from a broken server
+([experiment 002](https://github.com/jcarranz97/open-body-protocol/tree/main/experiments/002-agent-drives-body)).
+
 #### Sanitising body text
 
 A body's `description` and result text reach a model, and a body is a device

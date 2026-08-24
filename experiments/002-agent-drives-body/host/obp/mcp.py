@@ -16,7 +16,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Callable, TextIO
 
 from .registry import Registry
 
@@ -33,8 +33,12 @@ DEFAULT_REVISION = "2025-06-18"
 
 class McpServer:
     def __init__(self, registry: Registry, log_path: Path | None = None,
-                 out: TextIO | None = None) -> None:
+                 out: TextIO | None = None,
+                 attach: "Callable[[], list[str]] | None" = None) -> None:
         self.registry = registry
+        #: called by the status verb to retry attaching; returns problems
+        self.attach = attach
+        self.problems: list[str] = []
         self.out = out or sys.stdout
         self.log_path = log_path
         self.initialised = False
@@ -68,8 +72,34 @@ class McpServer:
 
     # --------------------------------------------------------- handlers
 
+    #: Always present, even with nothing attached. Without it a host whose
+    #: bodies all failed to attach is indistinguishable from a broken server.
+    STATUS_TOOL = {
+        "name": "obp__status",
+        "description": ("[host] Which bodies are attached right now, and why any "
+                        "are not. Call this first if no body verbs are available, "
+                        "or after fixing a problem to retry attaching."),
+        "inputSchema": {"type": "object", "properties": {}},
+    }
+
     def _tool_list(self) -> dict[str, Any]:
-        return {"tools": self.registry.tools()}
+        return {"tools": sorted(self.registry.tools() + [self.STATUS_TOOL],
+                                key=lambda t: t["name"])}
+
+    def _status(self) -> dict[str, Any]:
+        if self.attach is not None:
+            self.problems = self.attach()      # retry; a fixed problem clears
+        lines = []
+        for info in self.registry.bodies:
+            verbs = ", ".join(t.name for t in info.tools if not t.user_only)
+            lines.append(f"attached: {info.name} [{info.id}] — {verbs}")
+        if self.problems:
+            lines.append("")
+            lines += self.problems
+        if not lines:
+            lines = ["No bodies attached and no errors recorded."]
+        return {"content": [{"type": "text", "text": "\n".join(lines)}],
+                "isError": bool(self.problems and not self.registry.bodies)}
 
     def handle(self, msg: dict[str, Any]) -> None:
         method = msg.get("method")
@@ -108,6 +138,9 @@ class McpServer:
         if method == "tools/call":
             name = params.get("name", "")
             args = params.get("arguments") or {}
+            if name == self.STATUS_TOOL["name"]:
+                self._reply(req_id, self._status())
+                return
             # M5/M7: the body's own result passes through unchanged, and a
             # body that has gone produces an isError result, never a fault.
             self._reply(req_id, self.registry.call(name, args))

@@ -91,6 +91,7 @@ these, so that an agent's configuration is portable between hosts
 | M6 | **MUST** declare `tools.listChanged` and emit `notifications/tools/list_changed` when a body arrives or leaves. |
 | M7 | **MUST** return an `isError` tool result — never a protocol error, never a hang — when a body vanishes mid-call. |
 | M8 | **MUST** document whether `async` verbs block or detach. |
+| M9 | **MUST** remain available when no body is attached, and **SHOULD** offer a way for the caller to learn why. A server that exits because a body is unreachable is indistinguishable, to an agent, from a broken server. |
 
 ## Testing a body
 

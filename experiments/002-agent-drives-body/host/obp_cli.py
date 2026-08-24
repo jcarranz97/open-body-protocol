@@ -17,7 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from obp import BodyClient, BodyError, Registry, SerialTransport, SubprocessTransport  # noqa: E402
+from obp import (BodyClient, BodyError, BodyUnavailable, Registry,  # noqa: E402
+                 SerialTransport, SubprocessTransport)
 from obp.client import render_result  # noqa: E402
 from obp.naming import mcp_tool_name  # noqa: E402
 
@@ -63,6 +64,9 @@ def main() -> int:
 
     try:
         reg = attach(args)
+    except BodyUnavailable as exc:
+        print(exc, file=sys.stderr)
+        return 3
     except (BodyError, OSError) as exc:
         print(f"could not attach: {exc}", file=sys.stderr)
         return 3
