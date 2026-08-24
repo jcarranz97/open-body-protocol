@@ -52,7 +52,7 @@ you read only two things here, read the first two.
   **hunger, affection and energy**, and whose agent layer lets Claude Code,
   OpenCode, Cursor and other MCP clients drive the pet's reactions through an
   MCP server. Substantially the same idea as
-  [MCP § inbound](guides/using-obp-with-mcp.md),
+  [MCP § inbound](guides/connecting-agents.md),
   already built. Read it before writing `obp-mcp`.
 - **`geeks-accelerator/animal-house-ai-tamagotchi`** — MIT, tiny, and sharply
   framed: *"Tamagotchi for AI agents"*, delivered purely as an MCP server

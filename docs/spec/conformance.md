@@ -74,6 +74,23 @@ requirement here is one somebody would otherwise get wrong.
 | H11 | **SHOULD** treat all body-supplied text as untrusted data ([security](security.md)). |
 | H12 | **MUST NOT** require a capability label to be present before using a verb. |
 
+## A host exposing bodies over MCP
+
+Optional — a host need not speak MCP at all. One that does **MUST** follow
+these, so that an agent's configuration is portable between hosts
+([guide](../guides/connecting-agents.md)).
+
+| | Requirement |
+|---|---|
+| M1 | **MUST** name tools `<sanitised-body-id>__<verb>`, replacing characters outside `[a-zA-Z0-9_-]` with `_`. |
+| M2 | **MUST** keep names within 64 characters by truncating the body id — never the verb — and appending `_` plus six hex characters of the SHA-256 of the full `<id>__<verb>`. |
+| M3 | **MUST** produce the same tool name for the same body and verb on every host and every run. |
+| M4 | **MUST NOT** expose `userOnly` verbs. |
+| M5 | **MUST** pass `inputSchema`, `content` and `isError` through unchanged. |
+| M6 | **MUST** declare `tools.listChanged` and emit `notifications/tools/list_changed` when a body arrives or leaves. |
+| M7 | **MUST** return an `isError` tool result — never a protocol error, never a hang — when a body vanishes mid-call. |
+| M8 | **MUST** document whether `async` verbs block or detach. |
+
 ## Testing a body
 
 The reference host ships a conformance runner. With no hardware:

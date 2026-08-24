@@ -45,7 +45,7 @@ nav:
   - Rationale: rationale.md
   - Implementations: implementations.md
   - Guides:
-    - Using OBP with MCP: guides/using-obp-with-mcp.md
+    - Connecting an agent: guides/connecting-agents.md
   - Prior Art: prior-art.md
 
 markdown_extensions:

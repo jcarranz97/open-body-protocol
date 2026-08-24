@@ -14,7 +14,7 @@ There is no third role in this specification. **What decides — a language
 model, an agent harness, a script, a person pressing keys — is out of
 scope.** OBP says nothing about how a brain thinks, what it remembers, or
 who it is. A host may offer a body's verbs to a model through
-[MCP](../guides/using-obp-with-mcp.md), through function calling, or through
+[MCP](../guides/connecting-agents.md), through function calling, or through
 a menu; the body cannot tell the difference and must not care.
 
 ## What a body promises
