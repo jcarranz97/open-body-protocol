@@ -46,8 +46,17 @@ class McpServer:
 
     # --------------------------------------------------------------- io
 
-    def _log(self, direction: str, payload: Any) -> None:
-        line = f"{datetime.now(timezone.utc).isoformat()} {direction} {json.dumps(payload)[:400]}"
+    def _log(self, direction: str, payload: Any, full: bool = False) -> None:
+        """Append one line to the log.
+
+        Message traffic is truncated to keep the file readable. Structured
+        records are not: truncating JSON produces a line that cannot be
+        parsed, which defeats the point of writing it down.
+        """
+        rendered = json.dumps(payload)
+        if not full and len(rendered) > 400:
+            rendered = rendered[:400] + f"…+{len(rendered) - 400}b"
+        line = f"{datetime.now(timezone.utc).isoformat()} {direction} {rendered}"
         print(line, file=sys.stderr)
         if self.log_path:
             with self.log_path.open("a") as fh:

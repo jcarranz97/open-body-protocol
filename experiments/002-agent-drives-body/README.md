@@ -171,11 +171,32 @@ $ cd experiments/002-agent-drives-body && opencode mcp list
 ●  ✓ obp connected
 ```
 
+**Editing `opencode.json` mid-session changes nothing.** OpenCode spawns the
+server once at startup; a config change needs a full restart of OpenCode, not
+just a new prompt. This is the likeliest reason a corrected command "still
+does not work".
+
 Verify before starting a session:
 
 ```bash
 opencode mcp list
 ```
+
+And after starting one, check what the server actually did — every run now
+writes a startup record:
+
+```bash
+grep '###' /tmp/obp-mcp.log | tail -1
+```
+
+```json
+{"started": true, "groups": ["dialout", "docker", ...],
+ "bodies": [{"id": "pico-3f5022", "verbs": ["set_led", "blink", ...]}],
+ "problems": []}
+```
+
+`"bodies": []` with a problem naming `/dev/serial/by-id/...` means the server
+is healthy and the permission is not.
 
 ```text
 ┌  MCP Servers

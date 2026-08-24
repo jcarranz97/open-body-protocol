@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import argparse
+import grp
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +18,24 @@ from obp import (BodyClient, BodyError, BodyUnavailable, Registry,  # noqa: E402
                  SerialTransport, SubprocessTransport, describe_spec, expand,
                  resolve)
 from obp.mcp import McpServer  # noqa: E402
+
+
+def _group_names() -> list[str]:
+    """Every group this process can use for file access.
+
+    Note the effective GID as well as the supplementary list: `sg` changes
+    the effective GID and does not necessarily add to the supplementary
+    groups, so a process can be able to open a dialout device while
+    os.getgroups() alone says it cannot.
+    """
+    gids = set(os.getgroups()) | {os.getegid()}
+    names = []
+    for gid in gids:
+        try:
+            names.append(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            names.append(str(gid))
+    return sorted(names)
 
 
 def main() -> int:
@@ -72,6 +92,17 @@ def main() -> int:
 
     for p in problems:
         print(p, file=sys.stderr)
+
+    # Record startup in the log as well as on stderr. An agent's stderr goes
+    # nowhere a person can see, and the log is what the docs tell them to
+    # read when "the MCP server is not working".
+    server._log("###", {
+        "started": True,
+        "groups": _group_names(),
+        "bodies": [{"id": b.id, "name": b.name,
+                    "verbs": [t.name for t in b.tools]} for b in registry.bodies],
+        "problems": problems,
+    }, full=True)
     print(f"serving {len(registry.bodies)} bodies over MCP on stdio", file=sys.stderr)
 
     try:
