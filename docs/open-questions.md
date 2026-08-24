@@ -206,3 +206,72 @@ answer. Barge-in and event-signalling are the same problem, and only voice
 forced anyone to solve it. Which is the argument that a microphone is not a
 harder version of a button but the case that reveals what a button lets you
 get away with.
+
+## Whether a body with a microphone needs anything new
+
+A button is a bad model for sensing, because it hides two questions. A
+microphone asks both: what can a small machine actually compute, and what does
+the wire carry?
+
+**Raw audio does not belong in this protocol, and that is not a close call.**
+Seven voice systems were surveyed and none that had a choice text-encodes audio
+into a control message. Three shapes are used instead: a separate transport
+(xiaozhi's MQTT for control and UDP for Opus, whose documentation says plainly
+that *"control is separated from data so audio has low latency"*), a separate
+frame type on one connection (xiaozhi's WebSocket mode), or length-prefixed
+binary sitting outside the parsed object (Wyoming writes its JSON line, then
+raw bytes the parser skips by byte count — never base64).
+
+The forces all point the same way. Base64 inflates by a third before framing —
+OpenAI's WebSocket audio path costs about 1 Mbps against 32–56 kbps for the
+same speech as WebRTC Opus. Audio arrives every 20–60 ms forever, so any
+control message queued behind it is delivered late. And on a microcontroller,
+base64-encoding and JSON-parsing every frame competes with the codec for the
+same core.
+
+Notably, where control *does* bootstrap media, it carries a reference rather
+than the thing: xiaozhi hands the UDP encryption key over MQTT in its hello,
+and pushes downlink speech as an `audio_url` the device fetches for itself.
+
+**An utterance, however, is already an event, and OBP already has that
+message.** Four systems in production treat a spoken phrase as a discrete
+notification with a text payload — xiaozhi emits `{"type":"listen","state":
+"detect","text":"<wake word>"}`, Wyoming has `detection` and `transcript`,
+Hermes publishes `hermes/asr/textCaptured`, ESPHome exposes the transcript to
+the device itself. `notifications/body/event` with `type: "speech"` is the same
+shape, and needs no change.
+
+**What a body can put in that payload depends on what kind of machine it is,**
+and this is a hardware ceiling rather than a design choice. Free-form speech to
+text needs hundreds of megabytes — whisper tiny about 273 MB, Vosk small about
+300 MB — so a transcript never comes from a microcontroller. An ESP32-S3 with
+PSRAM and roughly 6 MB of flash manages a wake word and a closed vocabulary of
+a few hundred commands; a C3 or C5 with WakeNet9s manages a wake word alone; a
+Pi-class body transcribes. Picovoice draws the same line commercially: Rhino
+emits an intent on a Cortex-M, while transcription starts at a Raspberry Pi 3.
+
+A Pico is a button, not an ear, and the reason is compute rather than memory —
+the model and its arena come to about 48 KB against 264 KB available, but an
+M0+ with no FPU and no SIMD saturates on two keywords at 4 kHz.
+
+That variety is a good argument for the existing design rather than a problem
+for it: a body advertises only what it can do, so a `caps` entry and the verbs
+it offers already say whether a transcript is on the table. Where a body can do
+both, a transcript should be the primary payload and an intent an optional
+refinement beside it — a closed vocabulary drops from 91.5% to 78.25% accuracy
+under white noise, and a transcript is what keeps open-ended reasoning
+available to the brain.
+
+**Barge-in restates a rule this project already has.** When someone interrupts,
+the body must abort locally and immediately, then report *how much it actually
+rendered* — OpenAI's realtime API requires the client to send the number of
+milliseconds truly played, because the server produced audio faster than
+realtime and its own model of the world is wrong. Only the body knows what it
+did. That is [the same principle](../experiments/005-body-speaks-first/) as a
+body owning the report of its own actuation, arrived at from the opposite
+direction, and the analogue for a limb is the pose actually reached.
+
+So the open question is narrower than it looked. Nothing about an utterance
+needs new protocol. What OBP has no vocabulary for is a **media lane**: a way
+for a body to say "I have a stream, here is where to get it", negotiated by the
+control channel and carried somewhere else entirely.
