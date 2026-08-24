@@ -43,13 +43,19 @@ change would violate one of these, say so rather than working around it.
 ## Documentation
 
 `docs/` is [MkDocs Material](https://squidfunk.github.io/mkdocs-material/),
-laid out like the sibling projects `piezario` and `printforhelp`:
+laid out like the sibling projects `piezario` and `printforhelp`. Drive it
+with [uv](https://docs.astral.sh/uv/) — **do not create a virtualenv or pip
+install anything**:
 
 ```bash
-pip install mkdocs-material
-mkdocs serve                # read locally
-mkdocs build --strict       # what CI runs; broken links fail the build
+uvx --with mkdocs-material mkdocs serve           # read locally
+uvx --with mkdocs-material mkdocs build --strict  # what CI runs; warnings fail it
 ```
+
+The version is deliberately unpinned. Material 9.x already constrains
+`mkdocs<2`, so the announced MkDocs 2.0 plugin breakage cannot reach this
+repo while the major version stays at 9 — if Material ever ships a 10, pin
+it here before finding out the hard way.
 
 - `docs/brief.md` is the **original seed document, kept verbatim**. Treat it
   as a historical record: do not edit it to reflect later decisions. When the

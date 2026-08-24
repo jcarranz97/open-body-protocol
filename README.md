@@ -24,17 +24,26 @@ Three ideas hold it together:
 
 ## Documentation
 
-The docs are [MkDocs Material](https://squidfunk.github.io/mkdocs-material/).
-To read them locally:
+The docs are [MkDocs Material](https://squidfunk.github.io/mkdocs-material/),
+run through [uv](https://docs.astral.sh/uv/). There is no virtualenv to
+create, activate or remember:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install mkdocs-material
-mkdocs serve          # http://127.0.0.1:8000
+uvx --with mkdocs-material mkdocs serve    # http://127.0.0.1:8000
+```
+
+`uvx` resolves the toolchain into a cached throwaway environment — a couple
+of hundred milliseconds after the first run — and nothing is installed into
+your Python or into this repo. If you would rather have `mkdocs` on your
+`PATH` permanently:
+
+```bash
+uv tool install mkdocs --with mkdocs-material
 ```
 
 `mkdocs build --strict` is what CI runs on every pull request; pushes to
-`main` deploy to GitHub Pages via `.github/workflows/deploy-docs.yml`.
+`main` deploy to GitHub Pages via `.github/workflows/deploy-docs.yml`, which
+uses the same `uvx` invocation.
 
 | Document | What it covers |
 |---|---|
