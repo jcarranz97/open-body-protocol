@@ -152,3 +152,57 @@ reconnects after six hours should not act on a six-hour-old button press.
 
 The open part is not the transport. It is what turns a queued event into a turn
 in an agent's context, and whether OBP should say anything at all about it.
+
+### What the mechanisms actually are
+
+Research settled the host-side options, and they are worth writing down because
+the constraints are not obvious.
+
+**Claude Code Channels is an MCP server**, and a small one: declare
+`capabilities.experimental['claude/channel']` as an empty object, emit
+`notifications/claude/channel` with a `content` string and a `meta` map, and
+connect over stdio. The event reaches the model as a tag whose `source` is the
+server name and whose attributes come from `meta`. Registration needs both an
+`.mcp.json` entry and the server named at launch.
+
+Its limits matter more than its interface. It is a research preview whose flag
+syntax may change; it delivers **only into a live session** and cannot wake a
+dead one; and it is **fire-and-forget** — if the session did not load the
+server as a channel, events are dropped silently with no error to the sender.
+So a channel is a good doorbell and a bad system of record, which is the
+argument for the persistent-session backlog underneath it.
+
+It also confirms the constraint from the other direction: Claude Code will not
+register a channel server that negotiates the 2026-07-28 revision, *because
+that revision cannot carry channel messages*. Channels depend on precisely the
+server-initiated notifications that revision removed.
+
+**A server can push, but not usefully.** The claim "an MCP server cannot speak
+first" is slightly too strong: over a client-opened `subscriptions/listen`
+stream a server may push four notification types — tools/prompts/resources list
+changes and resource-subscription updates. None carries an application payload,
+so a robot event arrives as a doorbell with a URI and nothing else.
+
+**Blocking works over stdio and not over HTTP.** A tool call that blocks for
+30–300s is fine on a stdio server, which has no per-request timer. The same
+tool over HTTP hits a 60-second first-byte timer. This is what makes
+`obp__wait_for_event` viable in the attached-body case, and it is a property of
+the transport rather than of the design.
+
+The deeper objection to blocking is unchanged and is not about timeouts: it
+only works while the model is *already* calling the tool, which means the agent
+had to decide to wait. That leaves "an agent that is not currently looking"
+exactly where it was.
+
+**The pattern behind all of it.** Surveying agent frameworks, the ability to
+deliver an unsolicited event exists wherever a run is *not turn-shaped* —
+persistent bidirectional socket, actor mailbox, or durable server-side ingress.
+Everything shaped like `run() → result` answers no in the same way: the agent
+interrupts itself, the run ends, and the caller re-invokes with a resume token.
+
+The striking part is that every framework that has this solved got it through
+its **voice** branch, not its text branch — same vendor, same SDK, opposite
+answer. Barge-in and event-signalling are the same problem, and only voice
+forced anyone to solve it. Which is the argument that a microphone is not a
+harder version of a button but the case that reveals what a button lets you
+get away with.
